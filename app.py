@@ -1,11 +1,12 @@
 import requests , os , psutil , sys , jwt , pickle , json , binascii , time , urllib3 , base64 , datetime , re , socket , threading , ssl , pytz , aiohttp
+import asyncio
 from flask import Flask, request, jsonify
 from protobuf_decoder.protobuf_decoder import Parser
 from xC4 import * ; from xHeaders import *
 from datetime import datetime
 from google.protobuf.timestamp_pb2 import Timestamp
 from concurrent.futures import ThreadPoolExecutor
-from threading import Thread
+from threading import Thread, Event
 from Pb2 import DEcwHisPErMsG_pb2 , MajoRLoGinrEs_pb2 , PorTs_pb2 , MajoRLoGinrEq_pb2 , sQ_pb2 , Team_msg_pb2
 from cfonts import render, say
 import socket
@@ -43,6 +44,8 @@ spam_chat_id = None
 spam_uid = None
 Spy = False
 Chat_Leave = False
+loop = None
+loop_ready = Event()
 #------------------------------------------#
 
 app = Flask(__name__)
@@ -530,8 +533,6 @@ async def TcPChaT(ip, port, AutHToKen, key, iv, LoGinDaTaUncRypTinG, ready_event
         await asyncio.sleep(reconnect_delay)
 # ---------------------- FLASK ROUTES ----------------------
 
-loop = None
-
 async def perform_emote(team_code: str, uids: list, emote_id: int):
     global key, iv, region, online_writer, BOT_UID
 
@@ -564,6 +565,11 @@ async def perform_emote(team_code: str, uids: list, emote_id: int):
 @app.route('/join')
 def join_team():
     global loop
+    
+    # منتظر باش تا loop آماده شود
+    if not loop_ready.is_set():
+        return jsonify({"status": "error", "message": "Bot is starting, please wait..."}), 503
+    
     team_code = request.args.get('tc')
     uid1 = request.args.get('uid1')
     uid2 = request.args.get('uid2')
@@ -586,16 +592,20 @@ def join_team():
     if not uids:
         return jsonify({"status": "error", "message": "Provide at least one UID"})
 
-    asyncio.run_coroutine_threadsafe(
-        perform_emote(team_code, uids, emote_id), loop
-    )
+    try:
+        # اجرای کراوتین در event loop
+        asyncio.run_coroutine_threadsafe(
+            perform_emote(team_code, uids, emote_id), loop
+        )
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Failed to trigger emote: {str(e)}"})
 
     return jsonify({
         "status": "success",
         "team_code": team_code,
         "uids": uids,
         "emote_id": emote_id_str,
-        "message": "Emote triggered"
+        "message": "Emote triggered successfully"
     })
 
 
@@ -652,7 +662,7 @@ def run_flask():
 # ---------------------- MAIN BOT SYSTEM ----------------------
 
 async def MaiiiinE():
-    global loop, key, iv, region, BOT_UID
+    global loop, key, iv, region, BOT_UID, loop_ready
 
     # BOT LOGIN UID
     BOT_UID = int('4342953910')  # <-- FIXED BOT UID
@@ -681,7 +691,9 @@ async def MaiiiinE():
     iv = MajoRLoGinauTh.iv
     timestamp = MajoRLoGinauTh.timestamp
 
-    loop = asyncio.get_running_loop()
+    # ست کردن loop
+    loop = asyncio.get_event_loop()
+    loop_ready.set()  # علامت دادن که loop آماده است
 
     LoGinDaTa = await GetLoginData(UrL, PyL, ToKen)
     if not LoGinDaTa:
@@ -738,5 +750,21 @@ async def StarTinG():
 
 # برای Vercel
 if __name__ == '__main__':
+    # اجرای ربات در background
+    def run_bot():
+        asyncio.run(StarTinG())
+    
+    # شروع ربات در یک thread جدا
+    bot_thread = threading.Thread(target=run_bot, daemon=True)
+    bot_thread.start()
+    
+    # منتظر باش تا loop آماده شود (حداکثر 30 ثانیه)
+    import time
+    for _ in range(30):
+        if loop_ready.is_set():
+            break
+        time.sleep(1)
+    
+    # اجرای Flask
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
