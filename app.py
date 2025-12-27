@@ -8,6 +8,23 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Thread
 from Pb2 import DEcwHisPErMsG_pb2 , MajoRLoGinrEs_pb2 , PorTs_pb2 , MajoRLoGinrEq_pb2 , sQ_pb2 , Team_msg_pb2
 from cfonts import render, say
+import socket
+
+def find_free_port(start_port=5000, end_port=9000):
+    """پیدا کردن یک پورت آزاد در رنج مشخص شده"""
+    for port in range(start_port, end_port + 1):
+        try:
+            # تست کردن پورت
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(1)
+            result = sock.connect_ex(('0.0.0.0', port))
+            sock.close()
+            if result != 0:  # پورت آزاد است
+                return port
+        except:
+            continue
+    # اگر پورت آزاد پیدا نشد، از start_port استفاده کن
+    return start_port
 
 
 #EMOTES BY YASH X CODEX
@@ -525,7 +542,7 @@ async def perform_emote(team_code: str, uids: list, emote_id: int):
         # 1. JOIN SQUAD (super fast)
         EM = await GenJoinSquadsPacket(team_code, key, iv)
         await SEndPacKeT(None, online_writer, 'OnLine', EM)
-        await asyncio.sleep(0.12)  # minimal sync delay
+        await asyncio.sleep(0.05)  # minimal sync delay
 
         # 2. PERFORM EMOTE instantly
         for uid_str in uids:
@@ -536,7 +553,7 @@ async def perform_emote(team_code: str, uids: list, emote_id: int):
         # 3. LEAVE SQUAD instantly (correct bot UID)
         LV = await ExiT(BOT_UID, key, iv)
         await SEndPacKeT(None, online_writer, 'OnLine', LV)
-        await asyncio.sleep(0.03)
+        await asyncio.sleep(0.02)
 
         return {"status": "success", "message": "Emote done & bot left instantly"}
 
@@ -583,7 +600,53 @@ def join_team():
 
 
 def run_flask():
-    app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
+    import random
+    
+    # لیست پورت‌های پیشنهادی
+    suggested_ports = [5000, 5001, 5002, 5050, 5055, 5060, 5070, 5080, 
+                      6000, 6001, 6005, 6060, 6070, 6080, 6090,
+                      7000, 7001, 7005, 7070, 7080, 7090,
+                      8000, 8001, 8005, 8080, 8081, 8085, 8090,
+                      9000, 9001, 9005, 9090]
+    
+    # پیدا کردن پورت آزاد
+    free_port = None
+    for port in suggested_ports:
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(1)
+            result = sock.connect_ex(('0.0.0.0', port))
+            sock.close()
+            if result != 0:  # پورت آزاد است
+                free_port = port
+                break
+        except:
+            continue
+    
+    # اگر پورت آزاد پیدا نشد، رندوم انتخاب کن
+    if free_port is None:
+        while True:
+            random_port = random.randint(5000, 9000)
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(1)
+                result = sock.connect_ex(('0.0.0.0', random_port))
+                sock.close()
+                if result != 0:
+                    free_port = random_port
+                    break
+            except:
+                continue
+    
+    print(f"\n{'='*50}")
+    print(f"✅ Flask running on port: {free_port}")
+    print(f"🔗 Access URLs:")
+    print(f"   Local: http://localhost:{free_port}")
+    print(f"   Network: http://158.69.251.105:{free_port}")
+    print(f"   Example: http://158.69.251.105:{free_port}/join?tc=9135276&uid1=4285785816&emote_id=909000071")
+    print(f"{'='*50}\n")
+    
+    app.run(host='0.0.0.0', port=free_port, debug=False, use_reloader=False)
 
 
 # ---------------------- MAIN BOT SYSTEM ----------------------
@@ -673,5 +736,7 @@ async def StarTinG():
             print(f"ErroR TcP - {e} => ResTarTinG ...")
 
 
+# برای Vercel
 if __name__ == '__main__':
-    asyncio.run(StarTinG())
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
