@@ -215,16 +215,24 @@ async def quick_session_emote(team_code: str, uids: list, emote_id: int):
         iv = MajoRLoGinauTh.iv
         timestamp = MajoRLoGinauTh.timestamp
         
-        print(f"✅ Login successful - Region: {region}, UID: {TarGeT}")
+        print(f"✅ Login successful - Region: {region}, UID: {TarGeT}, URL: {UrL}")
         
         # 2. GET PORTS
+        print("📡 Getting login data...")
         LoGinDaTa = await GetLoginData(UrL, PyL, ToKen)
         if not LoGinDaTa:
             raise Exception("Failed to get login data")
         
         LoGinDaTaUncRypTinG = await DecRypTLoGinDaTa(LoGinDaTa)
         OnLinePorTs = LoGinDaTaUncRypTinG.Online_IP_Port
+        print(f"📡 Online ports: {OnLinePorTs}")
+        
+        # خطاگیری برای split
+        if ":" not in OnLinePorTs:
+            raise Exception(f"Invalid port format: {OnLinePorTs}")
+        
         OnLineiP, OnLineporT = OnLinePorTs.split(":")
+        print(f"📍 Parsed - IP: {OnLineiP}, Port: {OnLineporT}")
         
         # 3. CONNECT TO ONLINE SERVER
         print(f"🌐 Connecting to online server: {OnLineiP}:{OnLineporT}")
@@ -276,6 +284,8 @@ async def quick_session_emote(team_code: str, uids: list, emote_id: int):
         
     except Exception as e:
         print(f"❌ Error in session: {str(e)}")
+        import traceback
+        print(f"📝 Traceback: {traceback.format_exc()}")
         return {"status": "error", "message": str(e)}
 
 @app.route('/join')
