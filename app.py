@@ -11,42 +11,9 @@ from Pb2 import DEcwHisPErMsG_pb2 , MajoRLoGinrEs_pb2 , PorTs_pb2 , MajoRLoGinrE
 from cfonts import render, say
 import socket
 
-def find_free_port(start_port=5000, end_port=9000):
-    """پیدا کردن یک پورت آزاد در رنج مشخص شده"""
-    for port in range(start_port, end_port + 1):
-        try:
-            # تست کردن پورت
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(1)
-            result = sock.connect_ex(('0.0.0.0', port))
-            sock.close()
-            if result != 0:  # پورت آزاد است
-                return port
-        except:
-            continue
-    # اگر پورت آزاد پیدا نشد، از start_port استفاده کن
-    return start_port
-
-
 #EMOTES BY YASH X CODEX
 
-
-
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)  
-
-# VariabLes dyli 
-#------------------------------------------#
-online_writer = None
-whisper_writer = None
-spam_room = False
-spammer_uid = None
-spam_chat_id = None
-spam_uid = None
-Spy = False
-Chat_Leave = False
-loop = None
-loop_ready = Event()
-#------------------------------------------#
 
 app = Flask(__name__)
 
@@ -199,18 +166,6 @@ async def DecRypTLoGinDaTa(LoGinDaTa):
     proto.ParseFromString(LoGinDaTa)
     return proto
 
-async def DecodeWhisperMessage(hex_packet):
-    packet = bytes.fromhex(hex_packet)
-    proto = DEcwHisPErMsG_pb2.DecodeWhisper()
-    proto.ParseFromString(packet)
-    return proto
-    
-async def decode_team_packet(hex_packet):
-    packet = bytes.fromhex(hex_packet)
-    proto = sQ_pb2.recieved_chat()
-    proto.ParseFromString(packet)
-    return proto
-    
 async def xAuThSTarTuP(TarGeT, token, timestamp, key, iv):
     uid_hex = hex(TarGeT)[2:]
     uid_length = len(uid_hex)
@@ -224,352 +179,107 @@ async def xAuThSTarTuP(TarGeT, token, timestamp, key, iv):
     elif uid_length == 7: headers = '000000000'
     else: print('Unexpected length') ; headers = '0000000'
     return f"0115{headers}{uid_hex}{encrypted_timestamp}00000{encrypted_packet_length}{encrypted_packet}"
-     
-async def cHTypE(H):
-    if not H: return 'Squid'
-    elif H == 1: return 'CLan'
-    elif H == 2: return 'PrivaTe'
+
+async def SEndPacKeT(writer, PacKeT):
+    if writer:
+        writer.write(PacKeT)
+        await writer.drain()
+
+async def quick_session_emote(team_code: str, uids: list, emote_id: int):
+    """یک session سریع: login -> join -> emote -> disconnect"""
     
-async def SEndMsG(H , message , Uid , chat_id , key , iv):
-    TypE = await cHTypE(H)
-    if TypE == 'Squid': msg_packet = await xSEndMsgsQ(message , chat_id , key , iv)
-    elif TypE == 'CLan': msg_packet = await xSEndMsg(message , 1 , chat_id , chat_id , key , iv)
-    elif TypE == 'PrivaTe': msg_packet = await xSEndMsg(message , 2 , Uid , Uid , key , iv)
-    return msg_packet
-
-async def SEndPacKeT(OnLinE , ChaT , TypE , PacKeT):
-    if TypE == 'ChaT' and ChaT: whisper_writer.write(PacKeT) ; await whisper_writer.drain()
-    elif TypE == 'OnLine': online_writer.write(PacKeT) ; await online_writer.drain()
-    else: return 'UnsoPorTed TypE ! >> ErrrroR (:():)' 
-           
-async def TcPOnLine(ip, port, key, iv, AutHToKen, reconnect_delay=0.5):
-    global online_writer , spam_room , whisper_writer , spammer_uid , spam_chat_id , spam_uid , XX , uid , Spy,data2, Chat_Leave
-    while True:
-        try:
-            reader , writer = await asyncio.open_connection(ip, int(port))
-            online_writer = writer
-            bytes_payload = bytes.fromhex(AutHToKen)
-            online_writer.write(bytes_payload)
-            await online_writer.drain()
-            while True:
-                data2 = await reader.read(9999)
-                if not data2: break
-                
-                if data2.hex().startswith('0500') and len(data2.hex()) > 1000:
-                    try:
-                        print(data2.hex()[10:])
-                        packet = await DeCode_PackEt(data2.hex()[10:])
-                        print(packet)
-                        packet = json.loads(packet)
-                        OwNer_UiD , CHaT_CoDe , SQuAD_CoDe = await GeTSQDaTa(packet)
-
-                        JoinCHaT = await AutH_Chat(3 , OwNer_UiD , CHaT_CoDe, key,iv)
-                        await SEndPacKeT(whisper_writer , online_writer , 'ChaT' , JoinCHaT)
-
-
-                        message = f'[B][C]{get_random_color()}\n- WeLComE To Emote Bot ! '
-                        P = await SEndMsG(0 , message , OwNer_UiD , OwNer_UiD , key , iv)
-                        await SEndPacKeT(whisper_writer , online_writer , 'ChaT' , P)
-
-                    except:
-                        if data2.hex().startswith('0500') and len(data2.hex()) > 1000:
-                            try:
-                                print(data2.hex()[10:])
-                                packet = await DeCode_PackEt(data2.hex()[10:])
-                                print(packet)
-                                packet = json.loads(packet)
-                                OwNer_UiD , CHaT_CoDe , SQuAD_CoDe = await GeTSQDaTa(packet)
-
-                                JoinCHaT = await AutH_Chat(3 , OwNer_UiD , CHaT_CoDe, key,iv)
-                                await SEndPacKeT(whisper_writer , online_writer , 'ChaT' , JoinCHaT)
-
-
-                                message = f'[B][C]{get_random_color()}\n- WeLComE To Emote Bot ! \n\n{get_random_color()}- Commands : @a {xMsGFixinG("123456789")} {xMsGFixinG("909000001")}\n\n[00FF00]Dev : @{xMsGFixinG("DEVXTLIVE")}'
-                                P = await SEndMsG(0 , message , OwNer_UiD , OwNer_UiD , key , iv)
-                                await SEndPacKeT(whisper_writer , online_writer , 'ChaT' , P)
-                            except:
-                                pass
-
-            online_writer.close() ; await online_writer.wait_closed() ; online_writer = None
-
-        except Exception as e: print(f"- ErroR With {ip}:{port} - {e}") ; online_writer = None
-        await asyncio.sleep(reconnect_delay)
-                            
-async def TcPChaT(ip, port, AutHToKen, key, iv, LoGinDaTaUncRypTinG, ready_event, region , reconnect_delay=0.5):
-    print(region, 'TCP CHAT')
-
-    global spam_room , whisper_writer , spammer_uid , spam_chat_id , spam_uid , online_writer , chat_id , XX , uid , Spy,data2, Chat_Leave
-    while True:
-        try:
-            reader , writer = await asyncio.open_connection(ip, int(port))
-            whisper_writer = writer
-            bytes_payload = bytes.fromhex(AutHToKen)
-            whisper_writer.write(bytes_payload)
-            await whisper_writer.drain()
-            ready_event.set()
-            if LoGinDaTaUncRypTinG.Clan_ID:
-                clan_id = LoGinDaTaUncRypTinG.Clan_ID
-                clan_compiled_data = LoGinDaTaUncRypTinG.Clan_Compiled_Data
-                print('\n - TarGeT BoT in CLan ! ')
-                print(f' - Clan Uid > {clan_id}')
-                print(f' - BoT ConnEcTed WiTh CLan ChaT SuccEssFuLy ! ')
-                pK = await AuthClan(clan_id , clan_compiled_data , key , iv)
-                if whisper_writer: whisper_writer.write(pK) ; await whisper_writer.drain()
-            while True:
-                data = await reader.read(9999)
-                if not data: break
-                
-                if data.hex().startswith("120000"):
-
-                    msg = await DeCode_PackEt(data.hex()[10:])
-                    chatdata = json.loads(msg)
-                    try:
-                        response = await DecodeWhisperMessage(data.hex()[10:])
-                        uid = response.Data.uid
-                        chat_id = response.Data.Chat_ID
-                        XX = response.Data.chat_type
-                        inPuTMsG = response.Data.msg.lower()
-                    except:
-                        response = None
-
-
-                    if response:
-                        if inPuTMsG.startswith(("/5")):
-                            try:
-                                dd = chatdata['5']['data']['16']
-                                print('msg in private')
-                                message = f"[B][C]{get_random_color()}\n\nAccepT My InV FasT\n\n"
-                                P = await SEndMsG(response.Data.chat_type , message , uid , chat_id , key , iv)
-                                await SEndPacKeT(whisper_writer , online_writer , 'ChaT' , P)
-                                PAc = await OpEnSq(key , iv,region)
-                                await SEndPacKeT(whisper_writer , online_writer , 'OnLine' , PAc)
-                                C = await cHSq(5, uid ,key, iv,region)
-                                await asyncio.sleep(0.5)
-                                await SEndPacKeT(whisper_writer , online_writer , 'OnLine' , C)
-                                V = await SEnd_InV(5 , uid , key , iv,region)
-                                await asyncio.sleep(0.5)
-                                await SEndPacKeT(whisper_writer , online_writer , 'OnLine' , V)
-                                E = await ExiT(None , key , iv)
-                                await asyncio.sleep(3)
-                                await SEndPacKeT(whisper_writer , online_writer , 'OnLine' , E)
-                            except:
-                                print('msg in squad')
-
-
-
-                        if inPuTMsG.startswith('/x/'):
-                            CodE = inPuTMsG.split('/x/')[1]
-                            try:
-                                dd = chatdata['5']['data']['16']
-                                print('msg in private')
-                                EM = await GenJoinSquadsPacket(CodE , key , iv)
-                                await SEndPacKeT(whisper_writer , online_writer , 'OnLine' , EM)
-
-
-                            except:
-                                print('msg in squad')
-
-                        if inPuTMsG.startswith('leave'):
-                            leave = await ExiT(uid,key,iv)
-                            await SEndPacKeT(whisper_writer , online_writer , 'OnLine' , leave)
-
-                        if inPuTMsG.strip().startswith('/s'):
-                            EM = await FS(key , iv)
-                            await SEndPacKeT(whisper_writer , online_writer , 'OnLine' , EM)
-
-
-                        if inPuTMsG.strip().startswith('/f'):
-
-                            try:
-                                dd = chatdata['5']['data']['16']
-                                print('msg in private')
-                                message = f"[B][C]{get_random_color()}\n\nOnLy In SQuaD ! \n\n"
-                                P = await SEndMsG(response.Data.chat_type, message, uid, chat_id, key, iv)
-                                await SEndPacKeT(whisper_writer, online_writer, 'ChaT', P)
-
-                            except:
-                                print('msg in squad')
-
-                                parts = inPuTMsG.strip().split()
-                                print(response.Data.chat_type, uid, chat_id)
-                                message = f'[B][C]{get_random_color()}\nACITVE TarGeT -> {xMsGFixinG(uid)}\n'
-
-                                P = await SEndMsG(response.Data.chat_type, message, uid, chat_id, key, iv)
-
-                                uid2 = uid3 = uid4 = uid5 = uid6 = None
-                                s = False
-
-                                try:
-                                    uid = int(parts[1])
-                                    uid2 = int(parts[2])
-                                    uid3 = int(parts[3])
-                                    uid4 = int(parts[4])
-                                    uid5 = int(parts[5])
-                                    uid6 = int(parts[6])
-                                    idT = int(parts[6])
-
-                                except ValueError as ve:
-                                    print("ValueError:", ve)
-                                    s = True
-
-                                except Exception:
-                                    idT = len(parts) - 1
-                                    idT = int(parts[idT])
-                                    print(idT)
-                                    print(uid)
-
-                                if not s:
-                                    try:
-                                        await SEndPacKeT(whisper_writer, online_writer, 'ChaT', P)
-
-                                        # 🚀 Super Fast Emote Loop
-                                        for i in range(200):  # repeat count
-                                            print(f"Fast Emote {i+1}")
-                                            H = await Emote_k(uid, idT, key, iv, region)
-                                            await SEndPacKeT(whisper_writer, online_writer, 'OnLine', H)
-
-                                            if uid2:
-                                                H = await Emote_k(uid2, idT, key, iv, region)
-                                                await SEndPacKeT(whisper_writer, online_writer, 'OnLine', H)
-                                            if uid3:
-                                                H = await Emote_k(uid3, idT, key, iv, region)
-                                                await SEndPacKeT(whisper_writer, online_writer, 'OnLine', H)
-                                            if uid4:
-                                                H = await Emote_k(uid4, idT, key, iv, region)
-                                                await SEndPacKeT(whisper_writer, online_writer, 'OnLine', H)
-                                            if uid5:
-                                                H = await Emote_k(uid5, idT, key, iv, region)
-                                                await SEndPacKeT(whisper_writer, online_writer, 'OnLine', H)
-                                            if uid6:
-                                                H = await Emote_k(uid6, idT, key, iv, region)
-                                                await SEndPacKeT(whisper_writer, online_writer, 'OnLine', H)
-
-                                            await asyncio.sleep(0.08)  # ⚡ super-fast delay
-
-                                    except Exception as e:
-                                        print("Fast emote error:", e)
-
-                        if inPuTMsG.strip().startswith('/d'):
-
-                            try:
-                                dd = chatdata['5']['data']['16']
-                                print('msg in private')
-                                message = f"[B][C]{get_random_color()}\n\nOnLy In SQuaD ! \n\n"
-                                P = await SEndMsG(response.Data.chat_type, message, uid, chat_id, key, iv)
-                                await SEndPacKeT(whisper_writer, online_writer, 'ChaT', P)
-
-                            except:
-                                print('msg in squad')
-
-                                parts = inPuTMsG.strip().split()
-                                print(response.Data.chat_type, uid, chat_id)
-                                message = f'[B][C]{get_random_color()}\nACITVE TarGeT -> {xMsGFixinG(uid)}\n'
-
-                                P = await SEndMsG(response.Data.chat_type, message, uid, chat_id, key, iv)
-
-                                uid2 = uid3 = uid4 = uid5 = uid6 = None
-                                s = False
-
-                                try:
-                                    uid = int(parts[1])
-                                    uid2 = int(parts[2])
-                                    uid3 = int(parts[3])
-                                    uid4 = int(parts[4])
-                                    uid5 = int(parts[5])
-                                    uid6 = int(parts[6])
-                                    idT = int(parts[6])
-
-                                except ValueError as ve:
-                                    print("ValueError:", ve)
-                                    s = True
-
-                                except Exception:
-                                    idT = len(parts) - 1
-                                    idT = int(parts[idT])
-                                    print(idT)
-                                    print(uid)
-
-                                if not s:
-                                    try:
-                                        await SEndPacKeT(whisper_writer, online_writer, 'ChaT', P)
-
-                                        H = await Emote_k(uid, idT, key, iv,region)
-                                        await SEndPacKeT(whisper_writer, online_writer, 'OnLine', H)
-
-                                        if uid2:
-                                            H = await Emote_k(uid2, idT, key, iv,region)
-                                            await SEndPacKeT(whisper_writer, online_writer, 'OnLine', H)
-                                        if uid3:
-                                            H = await Emote_k(uid3, idT, key, iv,region)
-                                            await SEndPacKeT(whisper_writer, online_writer, 'OnLine', H)
-                                        if uid4:
-                                            H = await Emote_k(uid4, idT, key, iv,region)
-                                            await SEndPacKeT(whisper_writer, online_writer, 'OnLine', H)
-                                        if uid5:
-                                            H = await Emote_k(uid5, idT, key, iv,region)
-                                            await SEndPacKeT(whisper_writer, online_writer, 'OnLine', H)
-                                            if uid6:
-                                                H = await Emote_k(uid6, idT, key, iv, region)
-                                                await SEndPacKeT(whisper_writer, online_writer, 'OnLine', H)
-                                        
-
-                                    except Exception as e:
-                                        pass
-
-
-                        if inPuTMsG in ("dev"):
-                            uid = response.Data.uid
-                            chat_id = response.Data.Chat_ID
-                            message = '/d <uid1> <uid2>... <emoteid> /f <uid1> <uid2>... <emoteid> for fast emote'
-                            P = await SEndMsG(response.Data.chat_type , message , uid , chat_id , key , iv)
-                            await SEndPacKeT(whisper_writer , online_writer , 'ChaT' , P)
-                        response = None
-                            
-            whisper_writer.close() ; await whisper_writer.wait_closed() ; whisper_writer = None
-                    
-                    	
-                    	
-        except Exception as e: print(f"ErroR {ip}:{port} - {e}") ; whisper_writer = None
-        await asyncio.sleep(reconnect_delay)
-# ---------------------- FLASK ROUTES ----------------------
-
-async def perform_emote(team_code: str, uids: list, emote_id: int):
-    global key, iv, region, online_writer, BOT_UID
-
-    if online_writer is None:
-        raise Exception("Bot not connected")
-
+    # BOT LOGIN UID
+    BOT_UID = int('4342953910')
+    Uid, Pw = '4342953910', 'sidka_FI27F_SIDKASHOP_T3AMN'
+    
+    print(f"🚀 Starting quick session for team: {team_code}, uids: {uids}, emote: {emote_id}")
+    
     try:
-        # 1. JOIN SQUAD (super fast)
+        # 1. LOGIN
+        print("🔐 Logging in...")
+        open_id, access_token = await GeNeRaTeAccEss(Uid, Pw)
+        if not open_id or not access_token:
+            raise Exception("Invalid account")
+        
+        PyL = await EncRypTMajoRLoGin(open_id, access_token)
+        MajoRLoGinResPonsE = await MajorLogin(PyL)
+        if not MajoRLoGinResPonsE:
+            raise Exception("Account banned or not registered")
+        
+        MajoRLoGinauTh = await DecRypTMajoRLoGin(MajoRLoGinResPonsE)
+        UrL = MajoRLoGinauTh.url
+        region = MajoRLoGinauTh.region
+        ToKen = MajoRLoGinauTh.token
+        TarGeT = MajoRLoGinauTh.account_uid
+        key = MajoRLoGinauTh.key
+        iv = MajoRLoGinauTh.iv
+        timestamp = MajoRLoGinauTh.timestamp
+        
+        print(f"✅ Login successful - Region: {region}, UID: {TarGeT}")
+        
+        # 2. GET PORTS
+        LoGinDaTa = await GetLoginData(UrL, PyL, ToKen)
+        if not LoGinDaTa:
+            raise Exception("Failed to get login data")
+        
+        LoGinDaTaUncRypTinG = await DecRypTLoGinDaTa(LoGinDaTa)
+        OnLinePorTs = LoGinDaTaUncRypTinG.Online_IP_Port
+        OnLineiP, OnLineporT = OnLinePorTs.split(":")
+        
+        # 3. CONNECT TO ONLINE SERVER
+        print(f"🌐 Connecting to online server: {OnLineiP}:{OnLineporT}")
+        AutHToKen = await xAuThSTarTuP(int(TarGeT), ToKen, int(timestamp), key, iv)
+        
+        try:
+            reader, writer = await asyncio.wait_for(
+                asyncio.open_connection(OnLineiP, int(OnLineporT)),
+                timeout=5.0
+            )
+        except asyncio.TimeoutError:
+            raise Exception("Connection timeout")
+        
+        print("✅ Connected to online server")
+        
+        # 4. AUTHENTICATE
+        bytes_payload = bytes.fromhex(AutHToKen)
+        writer.write(bytes_payload)
+        await writer.drain()
+        
+        # 5. JOIN SQUAD
+        print(f"👥 Joining squad: {team_code}")
         EM = await GenJoinSquadsPacket(team_code, key, iv)
-        await SEndPacKeT(None, online_writer, 'OnLine', EM)
-        await asyncio.sleep(0.05)  # minimal sync delay
-
-        # 2. PERFORM EMOTE instantly
+        writer.write(EM)
+        await writer.drain()
+        await asyncio.sleep(0.5)  # Wait for join
+        
+        # 6. PERFORM EMOTE
+        print(f"🎭 Performing emote {emote_id} on {len(uids)} players")
         for uid_str in uids:
             uid = int(uid_str)
             H = await Emote_k(uid, emote_id, key, iv, region)
-            await SEndPacKeT(None, online_writer, 'OnLine', H)
-
-        # 3. LEAVE SQUAD instantly (correct bot UID)
+            writer.write(H)
+            await writer.drain()
+            await asyncio.sleep(0.1)  # Small delay between emotes
+        
+        # 7. LEAVE SQUAD
+        print("🚪 Leaving squad")
         LV = await ExiT(BOT_UID, key, iv)
-        await SEndPacKeT(None, online_writer, 'OnLine', LV)
-        await asyncio.sleep(0.02)
-
-        return {"status": "success", "message": "Emote done & bot left instantly"}
-
+        writer.write(LV)
+        await writer.drain()
+        
+        # 8. DISCONNECT
+        writer.close()
+        await writer.wait_closed()
+        
+        print("✅ Session completed successfully")
+        return {"status": "success", "message": "Emote completed"}
+        
     except Exception as e:
-        raise Exception(f"Failed to perform emote: {str(e)}")
-
+        print(f"❌ Error in session: {str(e)}")
+        return {"status": "error", "message": str(e)}
 
 @app.route('/join')
 def join_team():
-    global loop
-    
-    # منتظر باش تا loop آماده شود
-    if not loop_ready.is_set():
-        return jsonify({"status": "error", "message": "Bot is starting, please wait..."}), 503
-    
     team_code = request.args.get('tc')
     uid1 = request.args.get('uid1')
     uid2 = request.args.get('uid2')
@@ -593,178 +303,63 @@ def join_team():
         return jsonify({"status": "error", "message": "Provide at least one UID"})
 
     try:
-        # اجرای کراوتین در event loop
-        asyncio.run_coroutine_threadsafe(
-            perform_emote(team_code, uids, emote_id), loop
-        )
+        # اجرای session سریع
+        result = asyncio.run(quick_session_emote(team_code, uids, emote_id))
+        return jsonify(result)
+        
     except Exception as e:
-        return jsonify({"status": "error", "message": f"Failed to trigger emote: {str(e)}"})
+        return jsonify({"status": "error", "message": f"Failed: {str(e)}"})
 
+@app.route('/test')
+def test():
     return jsonify({
-        "status": "success",
-        "team_code": team_code,
-        "uids": uids,
-        "emote_id": emote_id_str,
-        "message": "Emote triggered successfully"
+        "status": "online",
+        "message": "Emote API is running",
+        "usage": "/join?tc=TEAM_CODE&uid1=UID&emote_id=EMOTE_ID",
+        "example": "/join?tc=123456&uid1=4285785816&emote_id=909000063"
     })
 
-
-def run_flask():
-    import random
-    
-    # لیست پورت‌های پیشنهادی
-    suggested_ports = [5000, 5001, 5002, 5050, 5055, 5060, 5070, 5080, 
-                      6000, 6001, 6005, 6060, 6070, 6080, 6090,
-                      7000, 7001, 7005, 7070, 7080, 7090,
-                      8000, 8001, 8005, 8080, 8081, 8085, 8090,
-                      9000, 9001, 9005, 9090]
-    
-    # پیدا کردن پورت آزاد
-    free_port = None
-    for port in suggested_ports:
-        try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(1)
-            result = sock.connect_ex(('0.0.0.0', port))
-            sock.close()
-            if result != 0:  # پورت آزاد است
-                free_port = port
-                break
-        except:
-            continue
-    
-    # اگر پورت آزاد پیدا نشد، رندوم انتخاب کن
-    if free_port is None:
-        while True:
-            random_port = random.randint(5000, 9000)
-            try:
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.settimeout(1)
-                result = sock.connect_ex(('0.0.0.0', random_port))
-                sock.close()
-                if result != 0:
-                    free_port = random_port
-                    break
-            except:
-                continue
-    
-    print(f"\n{'='*50}")
-    print(f"✅ Flask running on port: {free_port}")
-    print(f"🔗 Access URLs:")
-    print(f"   Local: http://localhost:{free_port}")
-    print(f"   Network: http://158.69.251.105:{free_port}")
-    print(f"   Example: http://158.69.251.105:{free_port}/join?tc=9135276&uid1=4285785816&emote_id=909000071")
-    print(f"{'='*50}\n")
-    
-    app.run(host='0.0.0.0', port=free_port, debug=False, use_reloader=False)
-
-
-# ---------------------- MAIN BOT SYSTEM ----------------------
-
-async def MaiiiinE():
-    global loop, key, iv, region, BOT_UID, loop_ready
-
-    # BOT LOGIN UID
-    BOT_UID = int('4342953910')  # <-- FIXED BOT UID
-
-    Uid, Pw = '4342953910', 'sidka_FI27F_SIDKASHOP_T3AMN'
-
-    open_id, access_token = await GeNeRaTeAccEss(Uid, Pw)
-    if not open_id or not access_token:
-        print("ErroR - InvaLid AccounT")
-        return None
-
-    PyL = await EncRypTMajoRLoGin(open_id, access_token)
-    MajoRLoGinResPonsE = await MajorLogin(PyL)
-    if not MajoRLoGinResPonsE:
-        print("TarGeT AccounT => BannEd / NoT ReGisTeReD !")
-        return None
-
-    MajoRLoGinauTh = await DecRypTMajoRLoGin(MajoRLoGinResPonsE)
-    UrL = MajoRLoGinauTh.url
-    print(UrL)
-    region = MajoRLoGinauTh.region
-
-    ToKen = MajoRLoGinauTh.token
-    TarGeT = MajoRLoGinauTh.account_uid
-    key = MajoRLoGinauTh.key
-    iv = MajoRLoGinauTh.iv
-    timestamp = MajoRLoGinauTh.timestamp
-
-    # ست کردن loop
-    loop = asyncio.get_event_loop()
-    loop_ready.set()  # علامت دادن که loop آماده است
-
-    LoGinDaTa = await GetLoginData(UrL, PyL, ToKen)
-    if not LoGinDaTa:
-        print("ErroR - GeTinG PorTs From LoGin DaTa !")
-        return None
-
-    LoGinDaTaUncRypTinG = await DecRypTLoGinDaTa(LoGinDaTa)
-    OnLinePorTs = LoGinDaTaUncRypTinG.Online_IP_Port
-    ChaTPorTs = LoGinDaTaUncRypTinG.AccountIP_Port
-
-    OnLineiP, OnLineporT = OnLinePorTs.split(":")
-    ChaTiP, ChaTporT = ChaTPorTs.split(":")
-
-    acc_name = LoGinDaTaUncRypTinG.AccountName
-    print(ToKen)
-
-    equie_emote(ToKen, UrL)
-
-    AutHToKen = await xAuThSTarTuP(int(TarGeT), ToKen, int(timestamp), key, iv)
-    ready_event = asyncio.Event()
-
-    task1 = asyncio.create_task(
-        TcPChaT(ChaTiP, ChaTporT, AutHToKen, key, iv,
-                LoGinDaTaUncRypTinG, ready_event, region)
-    )
-
-    await ready_event.wait()
-    await asyncio.sleep(1)
-
-    task2 = asyncio.create_task(
-        TcPOnLine(OnLineiP, OnLineporT, key, iv, AutHToKen)
-    )
-
-    os.system('clear')
-    print(render('DEV', colors=['white', 'green'], align='center'))
-    print(f"\n - BoT STarTinG And OnLine on TarGet : {TarGeT} | BOT NAME : {acc_name}")
-    print(" - BoT sTaTus > GooD | OnLinE ! (: \n")
-
-    flask_thread = threading.Thread(target=run_flask, daemon=True)
-    flask_thread.start()
-
-    await asyncio.gather(task1, task2)
-
-
-async def StarTinG():
-    while True:
-        try:
-            await asyncio.wait_for(MaiiiinE(), timeout=7 * 60 * 60)
-        except asyncio.TimeoutError:
-            print("Token ExpiRed ! , ResTartinG")
-        except Exception as e:
-            print(f"ErroR TcP - {e} => ResTarTinG ...")
-
+@app.route('/')
+def home():
+    return '''
+    <html>
+        <head>
+            <title>Free Fire Emote Bot API</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 40px; }
+                h1 { color: #333; }
+                .endpoint { background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 5px; }
+                code { background: #eee; padding: 2px 5px; }
+            </style>
+        </head>
+        <body>
+            <h1>🎭 Free Fire Emote Bot API</h1>
+            <p>API for sending emotes to players in Free Fire</p>
+            
+            <div class="endpoint">
+                <h3>📤 Send Emote</h3>
+                <p><code>GET /join?tc=TEAM_CODE&uid1=UID&emote_id=EMOTE_ID</code></p>
+                <p><strong>Parameters:</strong></p>
+                <ul>
+                    <li><code>tc</code>: Team/Squad Code (required)</li>
+                    <li><code>uid1, uid2, ... uid6</code>: Player UIDs (at least one required)</li>
+                    <li><code>emote_id</code>: Emote ID (required)</li>
+                </ul>
+                <p><strong>Example:</strong> <a href="/join?tc=123456&uid1=4285785816&emote_id=909000063">/join?tc=123456&uid1=4285785816&emote_id=909000063</a></p>
+            </div>
+            
+            <div class="endpoint">
+                <h3>🩺 Test Endpoint</h3>
+                <p><code>GET /test</code> - Check API status</p>
+                <p><a href="/test">/test</a></p>
+            </div>
+            
+            <p><strong>Note:</strong> Each request creates a new session (login → join → emote → disconnect).</p>
+        </body>
+    </html>
+    '''
 
 # برای Vercel
 if __name__ == '__main__':
-    # اجرای ربات در background
-    def run_bot():
-        asyncio.run(StarTinG())
-    
-    # شروع ربات در یک thread جدا
-    bot_thread = threading.Thread(target=run_bot, daemon=True)
-    bot_thread.start()
-    
-    # منتظر باش تا loop آماده شود (حداکثر 30 ثانیه)
-    import time
-    for _ in range(30):
-        if loop_ready.is_set():
-            break
-        time.sleep(1)
-    
-    # اجرای Flask
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
