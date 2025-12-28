@@ -35,8 +35,8 @@ Hr = {
     'Content-Type': "application/x-www-form-urlencoded",
     'Expect': "100-continue",
     'X-Unity-Version': "2018.4.11f1",
-    'X-GA": "v1 1",
-    'ReleaseVersion": "OB51"}
+    'X-GA': "v1 1",  # اینجا درست شده
+    'ReleaseVersion': "OB51"}  # اینجا درست شده
 
 # ---- تابع encrypted_proto که در xC4.py هست ----
 async def encrypted_proto(encoded_hex):
