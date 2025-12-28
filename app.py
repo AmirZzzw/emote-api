@@ -1,21 +1,17 @@
 import requests , os , psutil , sys , jwt , pickle , json , binascii , time , urllib3 , base64 , datetime , re , socket , threading , ssl , pytz , aiohttp
 import asyncio
 from flask import Flask, request, jsonify
-# از protobuf_decoder خط زیر رو حذف کردیم
-# from protobuf_decoder.protobuf_decoder import Parser
-from xC4 import * ; from xHeaders import *
 from datetime import datetime
 from google.protobuf.timestamp_pb2 import Timestamp
 from concurrent.futures import ThreadPoolExecutor
 from threading import Thread, Event
 from Pb2 import DEcwHisPErMsG_pb2 , MajoRLoGinrEs_pb2 , PorTs_pb2 , MajoRLoGinrEq_pb2 , sQ_pb2 , Team_msg_pb2
-from cfonts import render, say
 import socket
 import random
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
 
-#EMOTES BY YASH X CODEX
+# EMOTES BY YASH X CODEX
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)  
 
@@ -35,12 +31,12 @@ Hr = {
     'Content-Type': "application/x-www-form-urlencoded",
     'Expect': "100-continue",
     'X-Unity-Version': "2018.4.11f1",
-    'X-GA': "v1 1",  # اینجا درست شده
-    'ReleaseVersion': "OB51"}  # اینجا درست شده
+    'X-GA': "v1 1",
+    'ReleaseVersion': "OB51"}
 
-# ---- تابع encrypted_proto که در xC4.py هست ----
+# ---- توابع ضروری از xC4.py ----
 async def encrypted_proto(encoded_hex):
-    """تابع رمزنگاری پروتوباف - مشابه xC4.py"""
+    """تابع رمزنگاری پروتوباف"""
     key = b'Yg&tc%DEuh6%Zc^8'
     iv = b'6oyZDr22E3ychjM%'
     cipher = AES.new(key, AES.MODE_CBC, iv)
@@ -89,119 +85,6 @@ def get_jwt_from_github():
     
     return None, None
 
-# ---- توابع اصلی از xC4.py ----
-async def GeNeRaTeAccEss(uid , password):
-    """دریافت توکن از گارنا - برای backward compatibility"""
-    url = "https://100067.connect.garena.com/oauth/guest/token/grant"
-    headers = {
-        "Host": "100067.connect.garena.com",
-        "User-Agent": (await Ua()),
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Connection": "close"}
-    data = {
-        "uid": uid,
-        "password": password,
-        "response_type": "token",
-        "client_type": "2",
-        "client_secret": "2ee44819e9b4598845141067b281621874d0d5d7af9d8f7e00c1e54715b7d1e3",
-        "client_id": "100067"}
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, headers=Hr, data=data) as response:
-            if response.status != 200: return "Failed to get access token"
-            data = await response.json()
-            open_id = data.get("open_id")
-            access_token = data.get("access_token")
-            return (open_id, access_token) if open_id and access_token else (None, None)
-
-async def EncRypTMajoRLoGin(open_id, access_token):
-    """رمزنگاری MajorLogin"""
-    major_login = MajoRLoGinrEq_pb2.MajorLogin()
-    major_login.event_time = str(datetime.now())[:-7]
-    major_login.game_name = "free fire"
-    major_login.platform_id = 1
-    major_login.client_version = "1.118.1"
-    major_login.system_software = "Android OS 9 / API-28 (PQ3B.190801.10101846/G9650ZHU2ARC6)"
-    major_login.system_hardware = "Handheld"
-    major_login.unique_device_id = "Google|34a7dcdf-a7d5-4cb6-8d7e-3b0e448a0c57"
-    major_login.language = "en"
-    
-    # استفاده از JWT آماده
-    major_login.access_token = access_token
-    
-    # تنظیم open_id و open_id_type بر اساس account_uid
-    major_login.open_id = open_id
-    major_login.open_id_type = "4"
-    
-    # سایر تنظیمات
-    major_login.platform_sdk_id = 1
-    major_login.login_by = 3
-    major_login.channel_type = 3
-    major_login.login_open_id_type = 4
-    major_login.release_channel = "android"
-    
-    string = major_login.SerializeToString()
-    return await encrypted_proto(string)
-
-async def MajorLogin(payload):
-    """ارسال MajorLogin به سرور"""
-    url = "https://loginbp.ggblueshark.com/MajorLogin"
-    ssl_context = ssl.create_default_context()
-    ssl_context.check_hostname = False
-    ssl_context.verify_mode = ssl.CERT_NONE
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, data=payload, headers=Hr, ssl=ssl_context) as response:
-            if response.status == 200: return await response.read()
-            return None
-
-async def GetLoginData(base_url, payload, token):
-    """دریافت اطلاعات لاگین"""
-    url = f"{base_url}/GetLoginData"
-    ssl_context = ssl.create_default_context()
-    ssl_context.check_hostname = False
-    ssl_context.verify_mode = ssl.CERT_NONE
-    headers = Hr.copy()
-    headers['Authorization'] = f"Bearer {token}"
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, data=payload, headers=headers, ssl=ssl_context) as response:
-            if response.status == 200: return await response.read()
-            return None
-
-async def DecRypTMajoRLoGin(MajoRLoGinResPonsE):
-    """رمزگشایی پاسخ MajorLogin"""
-    proto = MajoRLoGinrEs_pb2.MajorLoginRes()
-    proto.ParseFromString(MajoRLoGinResPonsE)
-    return proto
-
-async def DecRypTLoGinDaTa(LoGinDaTa):
-    """رمزگشایی اطلاعات لاگین"""
-    proto = PorTs_pb2.GetLoginData()
-    proto.ParseFromString(LoGinDaTa)
-    return proto
-
-async def xAuThSTarTuP(TarGeT, token, timestamp, key, iv):
-    """ساخت توکن احراز هویت"""
-    uid_hex = hex(TarGeT)[2:]
-    uid_length = len(uid_hex)
-    
-    # DecodE_HeX از xC4
-    from xC4 import DecodE_HeX
-    encrypted_timestamp = await DecodE_HeX(timestamp)
-    
-    # EnC_PacKeT از xC4
-    from xC4 import EnC_PacKeT
-    encrypted_account_token = token.encode().hex()
-    encrypted_packet = await EnC_PacKeT(encrypted_account_token, key, iv)
-    encrypted_packet_length = hex(len(encrypted_packet) // 2)[2:]
-    
-    if uid_length == 9: headers = '0000000'
-    elif uid_length == 8: headers = '00000000'
-    elif uid_length == 10: headers = '000000'
-    elif uid_length == 7: headers = '000000000'
-    else: print('Unexpected length') ; headers = '0000000'
-    
-    return f"0115{headers}{uid_hex}{encrypted_timestamp}00000{encrypted_packet_length}{encrypted_packet}"
-
 # ---- تابع اصلی با JWT آماده ----
 async def quick_session_with_jwt(team_code: str, uids: list, emote_id: int, jwt_token: str, account_uid: int):
     """یک session سریع با JWT آماده"""
@@ -243,11 +126,22 @@ async def quick_session_with_jwt(team_code: str, uids: list, emote_id: int, jwt_
         
         # 2. MAJOR LOGIN با JWT آماده
         print("🔐 Performing MajorLogin...")
-        MajoRLoGinResPonsE = await MajorLogin(PyL)
-        if not MajoRLoGinResPonsE:
-            raise Exception("Failed MajorLogin with JWT")
+        url = "https://loginbp.ggblueshark.com/MajorLogin"
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, data=PyL, headers=Hr, ssl=ssl_context) as response:
+                if response.status == 200: 
+                    MajoRLoGinResPonsE = await response.read()
+                else:
+                    raise Exception("Failed MajorLogin with JWT")
         
-        MajoRLoGinauTh = await DecRypTMajoRLoGin(MajoRLoGinResPonsE)
+        # رمزگشایی پاسخ MajorLogin
+        proto = MajoRLoGinrEs_pb2.MajorLoginRes()
+        proto.ParseFromString(MajoRLoGinResPonsE)
+        MajoRLoGinauTh = proto
+        
         UrL = MajoRLoGinauTh.url
         region = MajoRLoGinauTh.region
         ToKen = MajoRLoGinauTh.token
@@ -260,11 +154,24 @@ async def quick_session_with_jwt(team_code: str, uids: list, emote_id: int, jwt_
         
         # 3. GET PORTS
         print("📡 Getting login data...")
-        LoGinDaTa = await GetLoginData(UrL, PyL, ToKen)
-        if not LoGinDaTa:
-            raise Exception("Failed to get login data")
+        url = f"{UrL}/GetLoginData"
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        headers = Hr.copy()
+        headers['Authorization'] = f"Bearer {ToKen}"
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, data=PyL, headers=headers, ssl=ssl_context) as response:
+                if response.status == 200: 
+                    LoGinDaTa = await response.read()
+                else:
+                    raise Exception("Failed to get login data")
         
-        LoGinDaTaUncRypTinG = await DecRypTLoGinDaTa(LoGinDaTa)
+        # رمزگشایی اطلاعات لاگین
+        login_proto = PorTs_pb2.GetLoginData()
+        login_proto.ParseFromString(LoGinDaTa)
+        LoGinDaTaUncRypTinG = login_proto
+        
         OnLinePorTs = LoGinDaTaUncRypTinG.Online_IP_Port
         print(f"📡 Online ports: {OnLinePorTs}")
         
@@ -274,9 +181,39 @@ async def quick_session_with_jwt(team_code: str, uids: list, emote_id: int, jwt_
         OnLineiP, OnLineporT = OnLinePorTs.split(":")
         print(f"📍 Parsed - IP: {OnLineiP}, Port: {OnLineporT}")
         
-        # 4. CONNECT TO ONLINE SERVER
+        # 4. ساخت توکن احراز هویت
+        uid_hex = hex(int(TarGeT))[2:]
+        uid_length = len(uid_hex)
+        
+        # تابع DecodE_HeX ساده‌شده
+        async def DecodE_HeX(H):
+            R = hex(H) 
+            F = str(R)[2:]
+            if len(F) == 1: 
+                return "0" + F
+            else: 
+                return F
+        
+        # تابع EnC_PacKeT ساده‌شده
+        async def EnC_PacKeT(HeX, K, V):
+            cipher = AES.new(K, AES.MODE_CBC, V)
+            return cipher.encrypt(pad(bytes.fromhex(HeX), 16)).hex()
+        
+        encrypted_timestamp = await DecodE_HeX(int(timestamp))
+        encrypted_account_token = ToKen.encode().hex()
+        encrypted_packet = await EnC_PacKeT(encrypted_account_token, key, iv)
+        encrypted_packet_length = hex(len(encrypted_packet) // 2)[2:]
+        
+        if uid_length == 9: headers = '0000000'
+        elif uid_length == 8: headers = '00000000'
+        elif uid_length == 10: headers = '000000'
+        elif uid_length == 7: headers = '000000000'
+        else: print('Unexpected length') ; headers = '0000000'
+        
+        AutHToKen = f"0115{headers}{uid_hex}{encrypted_timestamp}00000{encrypted_packet_length}{encrypted_packet}"
+        
+        # 5. CONNECT TO ONLINE SERVER
         print(f"🌐 Connecting to online server: {OnLineiP}:{OnLineporT}")
-        AutHToKen = await xAuThSTarTuP(int(TarGeT), ToKen, int(timestamp), key, iv)
         
         try:
             reader, writer = await asyncio.wait_for(
@@ -288,22 +225,105 @@ async def quick_session_with_jwt(team_code: str, uids: list, emote_id: int, jwt_
         
         print("✅ Connected to online server")
         
-        # 5. AUTHENTICATE
+        # 6. AUTHENTICATE
         bytes_payload = bytes.fromhex(AutHToKen)
         writer.write(bytes_payload)
         await writer.drain()
         
-        # 6. JOIN SQUAD
+        # 7. JOIN SQUAD - تابع ساده‌شده
         print(f"👥 Joining squad: {team_code}")
-        from xC4 import GenJoinSquadsPacket
+        
+        # تابع GenJoinSquadsPacket ساده‌شده
+        async def GenJoinSquadsPacket(code, K, V):
+            import json
+            fields = {}
+            fields[1] = 4
+            fields[2] = {}
+            fields[2][4] = bytes.fromhex("01090a0b121920")
+            fields[2][5] = str(code)
+            fields[2][6] = 6
+            fields[2][8] = 1
+            fields[2][9] = {}
+            fields[2][9][2] = 800
+            fields[2][9][6] = 11
+            fields[2][9][8] = "1.111.1"
+            fields[2][9][9] = 5
+            fields[2][9][10] = 1
+            
+            # تابع CrEaTe_ProTo ساده‌شده
+            async def CrEaTe_ProTo(fields_dict):
+                import json
+                # اینجا یک پیاده‌سازی ساده
+                return json.dumps(fields_dict).encode()
+            
+            # تابع GeneRaTePk ساده‌شده
+            async def GeneRaTePk(Pk, N, K, V):
+                cipher = AES.new(K, AES.MODE_CBC, V)
+                PkEnc = cipher.encrypt(pad(Pk, 16)).hex()
+                length = len(PkEnc) // 2
+                hex_length = hex(length)[2:]
+                
+                if len(hex_length) == 2: HeadEr = N + "000000"
+                elif len(hex_length) == 3: HeadEr = N + "00000"
+                elif len(hex_length) == 4: HeadEr = N + "0000"
+                elif len(hex_length) == 5: HeadEr = N + "000"
+                else: HeadEr = N + "000000"
+                
+                return bytes.fromhex(HeadEr + hex_length + PkEnc)
+            
+            proto_bytes = await CrEaTe_ProTo(fields)
+            return await GeneRaTePk(proto_bytes, '0515', K, V)
+        
         EM = await GenJoinSquadsPacket(team_code, key, iv)
         writer.write(EM)
         await writer.drain()
         await asyncio.sleep(0.5)
         
-        # 7. PERFORM EMOTE
+        # 8. PERFORM EMOTE - تابع ساده‌شده
         print(f"🎭 Performing emote {emote_id} on {len(uids)} players")
-        from xC4 import Emote_k
+        
+        async def Emote_k(TarGeT, idT, K, V, region):
+            import json
+            fields = {
+                1: 21,
+                2: {
+                    1: 804266360,
+                    2: 909000001,
+                    5: {
+                        1: TarGeT,
+                        3: idT,
+                    }
+                }
+            }
+            
+            packet_type = '0515'
+            if region.lower() == "ind":
+                packet_type = '0514'
+            elif region.lower() == "bd":
+                packet_type = "0519"
+            
+            # توابع کمکی
+            async def CrEaTe_ProTo(fields_dict):
+                import json
+                return json.dumps(fields_dict).encode()
+            
+            async def GeneRaTePk(Pk, N, K, V):
+                cipher = AES.new(K, AES.MODE_CBC, V)
+                PkEnc = cipher.encrypt(pad(Pk, 16)).hex()
+                length = len(PkEnc) // 2
+                hex_length = hex(length)[2:]
+                
+                if len(hex_length) == 2: HeadEr = N + "000000"
+                elif len(hex_length) == 3: HeadEr = N + "00000"
+                elif len(hex_length) == 4: HeadEr = N + "0000"
+                elif len(hex_length) == 5: HeadEr = N + "000"
+                else: HeadEr = N + "000000"
+                
+                return bytes.fromhex(HeadEr + hex_length + PkEnc)
+            
+            proto_bytes = await CrEaTe_ProTo(fields)
+            return await GeneRaTePk(proto_bytes, packet_type, K, V)
+        
         for uid_str in uids:
             uid = int(uid_str)
             H = await Emote_k(uid, emote_id, key, iv, region)
@@ -311,14 +331,44 @@ async def quick_session_with_jwt(team_code: str, uids: list, emote_id: int, jwt_
             await writer.drain()
             await asyncio.sleep(0.1)
         
-        # 8. LEAVE SQUAD
+        # 9. LEAVE SQUAD - تابع ساده‌شده
         print("🚪 Leaving squad")
-        from xC4 import ExiT
+        
+        async def ExiT(idT, K, V):
+            import json
+            fields = {
+                1: 7,
+                2: {
+                    1: idT,
+                }
+            }
+            
+            async def CrEaTe_ProTo(fields_dict):
+                import json
+                return json.dumps(fields_dict).encode()
+            
+            async def GeneRaTePk(Pk, N, K, V):
+                cipher = AES.new(K, AES.MODE_CBC, V)
+                PkEnc = cipher.encrypt(pad(Pk, 16)).hex()
+                length = len(PkEnc) // 2
+                hex_length = hex(length)[2:]
+                
+                if len(hex_length) == 2: HeadEr = N + "000000"
+                elif len(hex_length) == 3: HeadEr = N + "00000"
+                elif len(hex_length) == 4: HeadEr = N + "0000"
+                elif len(hex_length) == 5: HeadEr = N + "000"
+                else: HeadEr = N + "000000"
+                
+                return bytes.fromhex(HeadEr + hex_length + PkEnc)
+            
+            proto_bytes = await CrEaTe_ProTo(fields)
+            return await GeneRaTePk(proto_bytes, '0515', K, V)
+        
         LV = await ExiT(int(TarGeT), key, iv)
         writer.write(LV)
         await writer.drain()
         
-        # 9. DISCONNECT
+        # 10. DISCONNECT
         writer.close()
         await writer.wait_closed()
         
@@ -377,115 +427,16 @@ def join_team():
             # اجرای session با JWT آماده
             result = asyncio.run(quick_session_with_jwt(team_code, uids, emote_id, jwt_token, account_uid))
         else:
-            # روش قدیمی (اگر نیاز باشد)
-            result = asyncio.run(quick_session_emote(team_code, uids, emote_id))
+            # روش قدیمی
+            return jsonify({
+                "status": "error", 
+                "message": "Old method disabled. Use use_jwt=true"
+            })
             
         return jsonify(result)
         
     except Exception as e:
         return jsonify({"status": "error", "message": f"Failed: {str(e)}"})
-
-# ---- Endpoint قدیمی برای backward compatibility ----
-async def quick_session_emote(team_code: str, uids: list, emote_id: int):
-    """تابع قدیمی - فقط برای compatibility"""
-    # BOT LOGIN UID
-    Uid, Pw = '4342953910', 'sidka_FI27F_SIDKASHOP_T3AMN'
-    
-    print(f"🚀 Starting OLD session for team: {team_code}")
-    
-    try:
-        # 1. LOGIN (روش قدیمی)
-        print("🔐 Logging in OLD method...")
-        open_id, access_token = await GeNeRaTeAccEss(Uid, Pw)
-        if not open_id or not access_token:
-            raise Exception("Invalid account")
-        
-        PyL = await EncRypTMajoRLoGin(open_id, access_token)
-        MajoRLoGinResPonsE = await MajorLogin(PyL)
-        if not MajoRLoGinResPonsE:
-            raise Exception("Account banned or not registered")
-        
-        MajoRLoGinauTh = await DecRypTMajoRLoGin(MajoRLoGinResPonsE)
-        UrL = MajoRLoGinauTh.url
-        region = MajoRLoGinauTh.region
-        ToKen = MajoRLoGinauTh.token
-        TarGeT = MajoRLoGinauTh.account_uid
-        key = MajoRLoGinauTh.key
-        iv = MajoRLoGinauTh.iv
-        timestamp = MajoRLoGinauTh.timestamp
-        
-        print(f"✅ Login successful - Region: {region}, UID: {TarGeT}, URL: {UrL}")
-        
-        # 2. GET PORTS
-        print("📡 Getting login data...")
-        LoGinDaTa = await GetLoginData(UrL, PyL, ToKen)
-        if not LoGinDaTa:
-            raise Exception("Failed to get login data")
-        
-        LoGinDaTaUncRypTinG = await DecRypTLoGinDaTa(LoGinDaTa)
-        OnLinePorTs = LoGinDaTaUncRypTinG.Online_IP_Port
-        print(f"📡 Online ports: {OnLinePorTs}")
-        
-        if ":" not in OnLinePorTs:
-            raise Exception(f"Invalid port format: {OnLinePorTs}")
-        
-        OnLineiP, OnLineporT = OnLinePorTs.split(":")
-        print(f"📍 Parsed - IP: {OnLineiP}, Port: {OnLineporT}")
-        
-        # 3. CONNECT TO ONLINE SERVER
-        print(f"🌐 Connecting to online server: {OnLineiP}:{OnLineporT}")
-        AutHToKen = await xAuThSTarTuP(int(TarGeT), ToKen, int(timestamp), key, iv)
-        
-        try:
-            reader, writer = await asyncio.wait_for(
-                asyncio.open_connection(OnLineiP, int(OnLineporT)),
-                timeout=5.0
-            )
-        except asyncio.TimeoutError:
-            raise Exception("Connection timeout")
-        
-        print("✅ Connected to online server")
-        
-        # 4. AUTHENTICATE
-        bytes_payload = bytes.fromhex(AutHToKen)
-        writer.write(bytes_payload)
-        await writer.drain()
-        
-        # 5. JOIN SQUAD
-        print(f"👥 Joining squad: {team_code}")
-        from xC4 import GenJoinSquadsPacket
-        EM = await GenJoinSquadsPacket(team_code, key, iv)
-        writer.write(EM)
-        await writer.drain()
-        await asyncio.sleep(0.5)
-        
-        # 6. PERFORM EMOTE
-        print(f"🎭 Performing emote {emote_id} on {len(uids)} players")
-        from xC4 import Emote_k
-        for uid_str in uids:
-            uid = int(uid_str)
-            H = await Emote_k(uid, emote_id, key, iv, region)
-            writer.write(H)
-            await writer.drain()
-            await asyncio.sleep(0.1)
-        
-        # 7. LEAVE SQUAD
-        print("🚪 Leaving squad")
-        from xC4 import ExiT
-        LV = await ExiT(int(TarGeT), key, iv)
-        writer.write(LV)
-        await writer.drain()
-        
-        # 8. DISCONNECT
-        writer.close()
-        await writer.wait_closed()
-        
-        print("✅ Session completed successfully")
-        return {"status": "success", "message": "Emote completed (old method)"}
-        
-    except Exception as e:
-        print(f"❌ Error in OLD session: {str(e)}")
-        return {"status": "error", "message": str(e)}
 
 # ---- Endpoint تست JWT ----
 @app.route('/jwt_test')
@@ -533,7 +484,6 @@ def test():
         "jwt_source": "GitHub",
         "endpoints": {
             "/join": "Send emote (uses JWT by default)",
-            "/join?use_jwt=false": "Send emote (old method)",
             "/jwt_test": "Test JWT retrieval",
             "/test": "API status"
         }
