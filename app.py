@@ -9,8 +9,42 @@ import time
 app = Flask(__name__)
 
 # JWT Token های آماده
+import requests
+import time
+
 JWT_TOKENS_URL = "https://github.com/AmirZzzw/info-api/raw/refs/heads/main/jwt.json"
 
+async def get_jwt_tokens():
+    """دریافت JWT Tokens از لینک با cache"""
+    global _jwt_tokens, _last_fetch_time
+    
+    current_time = time.time()
+    if _jwt_tokens and (current_time - _last_fetch_time) < TOKEN_CACHE_DURATION:
+        return _jwt_tokens
+    
+    try:
+        # استفاده از requests به جای aiohttp برای GitHub
+        response = requests.get(
+            JWT_TOKENS_URL,
+            headers={
+                'Accept': 'application/json',
+                'User-Agent': 'Mozilla/5.0'
+            },
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            _jwt_tokens = response.json()
+            _last_fetch_time = current_time
+            print(f"✅ Loaded {len(_jwt_tokens)} JWT tokens")
+            return _jwt_tokens
+        else:
+            print(f"❌ GitHub API error: {response.status_code}")
+            
+    except Exception as e:
+        print(f"❌ Error fetching JWT tokens: {e}")
+    
+    return _jwt_tokens or []
 # Headers پیشفرض
 Hr = {
     'User-Agent': "Dalvik/2.1.0 (Linux; U; Android 11; ASUS_Z01QD Build/PI)",
@@ -37,13 +71,24 @@ async def get_jwt_tokens():
         return _jwt_tokens
     
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(JWT_TOKENS_URL) as response:
-                if response.status == 200:
-                    _jwt_tokens = await response.json()
-                    _last_fetch_time = current_time
-                    print(f"✅ Loaded {len(_jwt_tokens)} JWT tokens")
-                    return _jwt_tokens
+        # استفاده از requests به جای aiohttp برای GitHub
+        response = requests.get(
+            JWT_TOKENS_URL,
+            headers={
+                'Accept': 'application/json',
+                'User-Agent': 'Mozilla/5.0'
+            },
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            _jwt_tokens = response.json()
+            _last_fetch_time = current_time
+            print(f"✅ Loaded {len(_jwt_tokens)} JWT tokens")
+            return _jwt_tokens
+        else:
+            print(f"❌ GitHub API error: {response.status_code}")
+            
     except Exception as e:
         print(f"❌ Error fetching JWT tokens: {e}")
     
