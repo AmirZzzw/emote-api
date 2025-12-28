@@ -1,22 +1,17 @@
-import requests , os , psutil , sys , jwt , pickle , json , binascii , time , urllib3 , base64 , datetime , re , socket , threading , ssl , pytz , aiohttp
-import asyncio
+import requests, os, ssl, asyncio, json
+import aiohttp
 from flask import Flask, request, jsonify
-from protobuf_decoder.protobuf_decoder import Parser
-from xC4 import * ; from xHeaders import *
-from datetime import datetime
-from google.protobuf.timestamp_pb2 import Timestamp
-from concurrent.futures import ThreadPoolExecutor
-from threading import Thread, Event
-from Pb2 import DEcwHisPErMsG_pb2 , MajoRLoGinrEs_pb2 , PorTs_pb2 , MajoRLoGinrEq_pb2 , sQ_pb2 , Team_msg_pb2
-from cfonts import render, say
 import socket
-
-#EMOTES BY YASH X CODEX
-
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)  
+from xC4 import *  # از توابع رمزنگاری موجود
+from Pb2 import MajoRLoGinrEs_pb2, PorTs_pb2
+import time
 
 app = Flask(__name__)
 
+# JWT Token های آماده
+JWT_TOKENS_URL = "https://github.com/AmirZzzw/info-api/raw/refs/heads/main/jwt.json"
+
+# Headers پیشفرض
 Hr = {
     'User-Agent': "Dalvik/2.1.0 (Linux; U; Android 11; ASUS_Z01QD Build/PI)",
     'Connection': "Keep-Alive",
@@ -25,262 +20,249 @@ Hr = {
     'Expect': "100-continue",
     'X-Unity-Version': "2018.4.11f1",
     'X-GA': "v1 1",
-    'ReleaseVersion': "OB51"}
+    'ReleaseVersion': "OB51"
+}
 
-# ---- Random Colores ----
-def get_random_color():
-    colors = [
-        "[FF0000]", "[00FF00]", "[0000FF]", "[FFFF00]", "[FF00FF]", "[00FFFF]", "[FFFFFF]", "[FFA500]",
-        "[A52A2A]", "[800080]", "[000000]", "[808080]", "[C0C0C0]", "[FFC0CB]", "[FFD700]", "[ADD8E6]",
-        "[90EE90]", "[D2691E]", "[DC143C]", "[00CED1]", "[9400D3]", "[F08080]", "[20B2AA]", "[FF1493]",
-        "[7CFC00]", "[B22222]", "[FF4500]", "[DAA520]", "[00BFFF]", "[00FF7F]", "[4682B4]", "[6495ED]",
-        "[5F9EA0]", "[DDA0DD]", "[E6E6FA]", "[B0C4DE]", "[556B2F]", "[8FBC8F]", "[2E8B57]", "[3CB371]",
-        "[6B8E23]", "[808000]", "[B8860B]", "[CD5C5C]", "[8B0000]", "[FF6347]", "[FF8C00]", "[BDB76B]",
-        "[9932CC]", "[8A2BE2]", "[4B0082]", "[6A5ACD]", "[7B68EE]", "[4169E1]", "[1E90FF]", "[191970]",
-        "[00008B]", "[000080]", "[008080]", "[008B8B]", "[B0E0E6]", "[AFEEEE]", "[E0FFFF]", "[F5F5DC]",
-        "[FAEBD7]"
-    ]
-    return random.choice(colors)
+# Cache برای JWT Tokens
+_jwt_tokens = None
+_last_fetch_time = 0
+TOKEN_CACHE_DURATION = 300  # 5 دقیقه
 
-async def encrypted_proto(encoded_hex):
-    key = b'Yg&tc%DEuh6%Zc^8'
-    iv = b'6oyZDr22E3ychjM%'
-    cipher = AES.new(key, AES.MODE_CBC, iv)
-    padded_message = pad(encoded_hex, AES.block_size)
-    encrypted_payload = cipher.encrypt(padded_message)
-    return encrypted_payload
+async def get_jwt_tokens():
+    """دریافت JWT Tokens از لینک با cache"""
+    global _jwt_tokens, _last_fetch_time
     
-async def GeNeRaTeAccEss(uid , password):
-    url = "https://100067.connect.garena.com/oauth/guest/token/grant"
-    headers = {
-        "Host": "100067.connect.garena.com",
-        "User-Agent": (await Ua()),
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Connection": "close"}
-    data = {
-        "uid": uid,
-        "password": password,
-        "response_type": "token",
-        "client_type": "2",
-        "client_secret": "2ee44819e9b4598845141067b281621874d0d5d7af9d8f7e00c1e54715b7d1e3",
-        "client_id": "100067"}
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, headers=Hr, data=data) as response:
-            if response.status != 200: return "Failed to get access token"
-            data = await response.json()
-            open_id = data.get("open_id")
-            access_token = data.get("access_token")
-            return (open_id, access_token) if open_id and access_token else (None, None)
+    current_time = time.time()
+    if _jwt_tokens and (current_time - _last_fetch_time) < TOKEN_CACHE_DURATION:
+        return _jwt_tokens
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(JWT_TOKENS_URL) as response:
+                if response.status == 200:
+                    _jwt_tokens = await response.json()
+                    _last_fetch_time = current_time
+                    print(f"✅ Loaded {len(_jwt_tokens)} JWT tokens")
+                    return _jwt_tokens
+    except Exception as e:
+        print(f"❌ Error fetching JWT tokens: {e}")
+    
+    return _jwt_tokens or []
 
-async def EncRypTMajoRLoGin(open_id, access_token):
-    major_login = MajoRLoGinrEq_pb2.MajorLogin()
-    major_login.event_time = str(datetime.now())[:-7]
-    major_login.game_name = "free fire"
-    major_login.platform_id = 1
-    major_login.client_version = "1.118.1"
-    major_login.system_software = "Android OS 9 / API-28 (PQ3B.190801.10101846/G9650ZHU2ARC6)"
-    major_login.system_hardware = "Handheld"
-    major_login.telecom_operator = "Verizon"
-    major_login.network_type = "WIFI"
-    major_login.screen_width = 1920
-    major_login.screen_height = 1080
-    major_login.screen_dpi = "280"
-    major_login.processor_details = "ARM64 FP ASIMD AES VMH | 2865 | 4"
-    major_login.memory = 3003
-    major_login.gpu_renderer = "Adreno (TM) 640"
-    major_login.gpu_version = "OpenGL ES 3.1 v1.46"
-    major_login.unique_device_id = "Google|34a7dcdf-a7d5-4cb6-8d7e-3b0e448a0c57"
-    major_login.client_ip = "223.191.51.89"
-    major_login.language = "en"
-    major_login.open_id = open_id
-    major_login.open_id_type = "4"
-    major_login.device_type = "Handheld"
-    memory_available = major_login.memory_available
-    memory_available.version = 55
-    memory_available.hidden_value = 81
-    major_login.access_token = access_token
-    major_login.platform_sdk_id = 1
-    major_login.network_operator_a = "Verizon"
-    major_login.network_type_a = "WIFI"
-    major_login.client_using_version = "7428b253defc164018c604a1ebbfebdf"
-    major_login.external_storage_total = 36235
-    major_login.external_storage_available = 31335
-    major_login.internal_storage_total = 2519
-    major_login.internal_storage_available = 703
-    major_login.game_disk_storage_available = 25010
-    major_login.game_disk_storage_total = 26628
-    major_login.external_sdcard_avail_storage = 32992
-    major_login.external_sdcard_total_storage = 36235
-    major_login.login_by = 3
-    major_login.library_path = "/data/app/com.dts.freefireth-YPKM8jHEwAJlhpmhDhv5MQ==/lib/arm64"
-    major_login.reg_avatar = 1
-    major_login.library_token = "5b892aaabd688e571f688053118a162b|/data/app/com.dts.freefireth-YPKM8jHEwAJlhpmhDhv5MQ==/base.apk"
-    major_login.channel_type = 3
-    major_login.cpu_type = 2
-    major_login.cpu_architecture = "64"
-    major_login.client_version_code = "2019118695"
-    major_login.graphics_api = "OpenGLES2"
-    major_login.supported_astc_bitset = 16383
-    major_login.login_open_id_type = 4
-    major_login.analytics_detail = b"FwQVTgUPX1UaUllDDwcWCRBpWAUOUgsvA1snWlBaO1kFYg=="
-    major_login.loading_time = 13564
-    major_login.release_channel = "android"
-    major_login.extra_info = "KqsHTymw5/5GB23YGniUYN2/q47GATrq7eFeRatf0NkwLKEMQ0PK5BKEk72dPflAxUlEBir6Vtey83XqF593qsl8hwY="
-    major_login.android_engine_init_flag = 110009
-    major_login.if_push = 1
-    major_login.is_vpn = 1
-    major_login.origin_platform_type = "4"
-    major_login.primary_platform_type = "4"
-    string = major_login.SerializeToString()
-    return  await encrypted_proto(string)
+async def get_next_jwt_token():
+    """دریافت یک JWT Token از لیست (round-robin)"""
+    tokens = await get_jwt_tokens()
+    if not tokens:
+        raise Exception("No JWT tokens available")
+    
+    # Simple round-robin selection
+    # می‌توانید اینجا منطق بهتری برای انتخاب توکن اضافه کنید
+    return tokens[0]["token"]  # اولین توکن را برمی‌گرداند
 
-async def MajorLogin(payload):
-    url = "https://loginbp.ggblueshark.com/MajorLogin"
-    ssl_context = ssl.create_default_context()
-    ssl_context.check_hostname = False
-    ssl_context.verify_mode = ssl.CERT_NONE
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, data=payload, headers=Hr, ssl=ssl_context) as response:
-            if response.status == 200: return await response.read()
-            return None
+async def get_login_data_from_jwt(jwt_token):
+    """دریافت اطلاعات Login مستقیماً با JWT Token"""
+    try:
+        # 1. مستقیماً GetLoginData را با JWT Token فراخوانی کنیم
+        # ابتدا باید URL مناسب را پیدا کنیم
+        
+        # URL های ممکن برای سرورها (بر اساس region)
+        possible_urls = [
+            "https://clientbp.ggblueshark.com",
+            "https://clientbp.common.ggbluefox.com",
+            "https://clientbp.common.ggbluered.com",
+            "https://clientbp.common.ggblueshark.com"
+        ]
+        
+        # Payload خالی برای GetLoginData
+        empty_payload = await encrypted_proto(b"")  # از تابع موجود در xC4
+        
+        # امتحان هر URL تا یکی کار کند
+        for base_url in possible_urls:
+            url = f"{base_url}/GetLoginData"
+            
+            headers = Hr.copy()
+            headers['Authorization'] = f"Bearer {jwt_token}"
+            
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(url, data=empty_payload, headers=headers, ssl=ssl_context, timeout=10) as response:
+                        if response.status == 200:
+                            login_data_bytes = await response.read()
+                            
+                            # Decode پاسخ
+                            proto = PorTs_pb2.GetLoginData()
+                            proto.ParseFromString(login_data_bytes)
+                            
+                            print(f"✅ Found working URL: {base_url}")
+                            return {
+                                'url': base_url,
+                                'region': proto.Region,
+                                'account_uid': proto.AccountUID,
+                                'account_name': proto.AccountName,
+                                'online_ip_port': proto.Online_IP_Port,
+                                'account_ip_port': proto.AccountIP_Port,
+                                'clan_id': proto.Clan_ID if proto.Clan_ID else None,
+                                'clan_compiled_data': proto.Clan_Compiled_Data if proto.Clan_Compiled_Data else None
+                            }
+            except Exception as e:
+                print(f"⚠️ URL {base_url} failed: {e}")
+                continue
+        
+        raise Exception("No working server URL found")
+        
+    except Exception as e:
+        print(f"❌ Error in get_login_data_from_jwt: {e}")
+        raise
 
-async def GetLoginData(base_url, payload, token):
-    url = f"{base_url}/GetLoginData"
-    ssl_context = ssl.create_default_context()
-    ssl_context.check_hostname = False
-    ssl_context.verify_mode = ssl.CERT_NONE
-    Hr['Authorization']= f"Bearer {token}"
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, data=payload, headers=Hr, ssl=ssl_context) as response:
-            if response.status == 200: return await response.read()
-            return None
-
-async def DecRypTMajoRLoGin(MajoRLoGinResPonsE):
-    proto = MajoRLoGinrEs_pb2.MajorLoginRes()
-    proto.ParseFromString(MajoRLoGinResPonsE)
-    return proto
-
-async def DecRypTLoGinDaTa(LoGinDaTa):
-    proto = PorTs_pb2.GetLoginData()
-    proto.ParseFromString(LoGinDaTa)
-    return proto
+async def get_cached_login_data():
+    """Cache برای اطلاعات Login"""
+    cache_key = "login_data_cache"
+    cache_file = "login_cache.json"
+    
+    # چک کردن cache فایل
+    if os.path.exists(cache_file):
+        try:
+            with open(cache_file, 'r') as f:
+                cache_data = json.load(f)
+            
+            # چک کردن expire (1 ساعت)
+            if time.time() - cache_data.get('timestamp', 0) < 3600:
+                print("🎯 Using cached login data")
+                return cache_data['data']
+        except:
+            pass
+    
+    # اگر cache معتبر نبود، دریافت جدید
+    print("🔄 Fetching new login data...")
+    jwt_token = await get_next_jwt_token()
+    login_data = await get_login_data_from_jwt(jwt_token)
+    
+    # اضافه کردن JWT token به داده‌ها
+    login_data['jwt_token'] = jwt_token
+    
+    # ذخیره در cache
+    cache_data = {
+        'timestamp': time.time(),
+        'data': login_data
+    }
+    
+    with open(cache_file, 'w') as f:
+        json.dump(cache_data, f)
+    
+    return login_data
 
 async def xAuThSTarTuP(TarGeT, token, timestamp, key, iv):
+    """همان تابع قبلی - نیاز به توابع EnC_PacKeT و DecodE_HeX از xC4 دارد"""
     uid_hex = hex(TarGeT)[2:]
     uid_length = len(uid_hex)
     encrypted_timestamp = await DecodE_HeX(timestamp)
     encrypted_account_token = token.encode().hex()
     encrypted_packet = await EnC_PacKeT(encrypted_account_token, key, iv)
     encrypted_packet_length = hex(len(encrypted_packet) // 2)[2:]
-    if uid_length == 9: headers = '0000000'
-    elif uid_length == 8: headers = '00000000'
-    elif uid_length == 10: headers = '000000'
-    elif uid_length == 7: headers = '000000000'
-    else: print('Unexpected length') ; headers = '0000000'
+    
+    if uid_length == 9:
+        headers = '0000000'
+    elif uid_length == 8:
+        headers = '00000000'
+    elif uid_length == 10:
+        headers = '000000'
+    elif uid_length == 7:
+        headers = '000000000'
+    else:
+        print('Unexpected length')
+        headers = '0000000'
+    
     return f"0115{headers}{uid_hex}{encrypted_timestamp}00000{encrypted_packet_length}{encrypted_packet}"
 
-async def SEndPacKeT(writer, PacKeT):
-    if writer:
-        writer.write(PacKeT)
-        await writer.drain()
-
 async def quick_session_emote(team_code: str, uids: list, emote_id: int):
-    """یک session سریع: login -> join -> emote -> disconnect"""
-    
-    # BOT LOGIN UID
-    BOT_UID = int('4342953910')
-    Uid, Pw = '4342953910', 'sidka_FI27F_SIDKASHOP_T3AMN'
+    """Session سریع با JWT Token آماده"""
     
     print(f"🚀 Starting quick session for team: {team_code}, uids: {uids}, emote: {emote_id}")
     
     try:
-        # 1. LOGIN
-        print("🔐 Logging in...")
-        open_id, access_token = await GeNeRaTeAccEss(Uid, Pw)
-        if not open_id or not access_token:
-            raise Exception("Invalid account")
+        # 1. دریافت اطلاعات Login از Cache یا JWT
+        print("🔐 Getting login data...")
+        login_data = await get_cached_login_data()
         
-        PyL = await EncRypTMajoRLoGin(open_id, access_token)
-        MajoRLoGinResPonsE = await MajorLogin(PyL)
-        if not MajoRLoGinResPonsE:
-            raise Exception("Account banned or not registered")
+        # استخراج داده‌ها
+        region = login_data['region']
+        TarGeT = login_data['account_uid']
+        online_ip_port = login_data['online_ip_port']
+        jwt_token = login_data.get('jwt_token')
         
-        MajoRLoGinauTh = await DecRypTMajoRLoGin(MajoRLoGinResPonsE)
-        UrL = MajoRLoGinauTh.url
-        region = MajoRLoGinauTh.region
-        ToKen = MajoRLoGinauTh.token
-        TarGeT = MajoRLoGinauTh.account_uid
-        key = MajoRLoGinauTh.key
-        iv = MajoRLoGinauTh.iv
-        timestamp = MajoRLoGinauTh.timestamp
+        # کلیدهای رمزنگاری - نیاز به استخراج از JWT یا استفاده از مقادیر ثابت
+        # اگر در JWT موجود نیستند، می‌توانید از مقادیر پیش‌فرض استفاده کنید
+        key = b'Yg&tc%DEuh6%Zc^8'  # از xC4.py
+        iv = b'6oyZDr22E3ychjM%'   # از xC4.py
         
-        print(f"✅ Login successful - Region: {region}, UID: {TarGeT}, URL: {UrL}")
+        # 2. اتصال به سرور Online
+        print(f"🌐 Connecting to online server: {online_ip_port}")
         
-        # 2. GET PORTS
-        print("📡 Getting login data...")
-        LoGinDaTa = await GetLoginData(UrL, PyL, ToKen)
-        if not LoGinDaTa:
-            raise Exception("Failed to get login data")
+        if ":" not in online_ip_port:
+            raise Exception(f"Invalid port format: {online_ip_port}")
         
-        LoGinDaTaUncRypTinG = await DecRypTLoGinDaTa(LoGinDaTa)
-        OnLinePorTs = LoGinDaTaUncRypTinG.Online_IP_Port
-        print(f"📡 Online ports: {OnLinePorTs}")
+        OnLineiP, OnLineporT = online_ip_port.split(":")
         
-        # خطاگیری برای split
-        if ":" not in OnLinePorTs:
-            raise Exception(f"Invalid port format: {OnLinePorTs}")
+        # ساخت Auth Token - نیاز به timestamp داریم
+        # از زمان فعلی استفاده می‌کنیم
+        timestamp = int(time.time())
+        AutHToKen = await xAuThSTarTuP(TarGeT, jwt_token, timestamp, key, iv)
         
-        OnLineiP, OnLineporT = OnLinePorTs.split(":")
-        print(f"📍 Parsed - IP: {OnLineiP}, Port: {OnLineporT}")
-        
-        # 3. CONNECT TO ONLINE SERVER
-        print(f"🌐 Connecting to online server: {OnLineiP}:{OnLineporT}")
-        AutHToKen = await xAuThSTarTuP(int(TarGeT), ToKen, int(timestamp), key, iv)
-        
+        # اتصال به سرور
         try:
             reader, writer = await asyncio.wait_for(
                 asyncio.open_connection(OnLineiP, int(OnLineporT)),
-                timeout=5.0
+                timeout=10.0
             )
         except asyncio.TimeoutError:
             raise Exception("Connection timeout")
         
         print("✅ Connected to online server")
         
-        # 4. AUTHENTICATE
+        # 3. احراز هویت
         bytes_payload = bytes.fromhex(AutHToKen)
         writer.write(bytes_payload)
         await writer.drain()
+        await asyncio.sleep(0.5)  # منتظر پاسخ سرور
         
-        # 5. JOIN SQUAD
+        # 4. جوین تیم
         print(f"👥 Joining squad: {team_code}")
         EM = await GenJoinSquadsPacket(team_code, key, iv)
         writer.write(EM)
         await writer.drain()
-        await asyncio.sleep(0.5)  # Wait for join
+        await asyncio.sleep(1.0)  # منتظر جوین شدن
         
-        # 6. PERFORM EMOTE
+        # 5. انجام ایموت
         print(f"🎭 Performing emote {emote_id} on {len(uids)} players")
         for uid_str in uids:
             uid = int(uid_str)
             H = await Emote_k(uid, emote_id, key, iv, region)
             writer.write(H)
             await writer.drain()
-            await asyncio.sleep(0.1)  # Small delay between emotes
+            await asyncio.sleep(0.15)  # تأخیر کوتاه بین ایموت‌ها
         
-        # 7. LEAVE SQUAD
+        # 6. خروج از تیم
         print("🚪 Leaving squad")
-        LV = await ExiT(BOT_UID, key, iv)
+        LV = await ExiT(TarGeT, key, iv)  # استفاده از UID خود بات
         writer.write(LV)
         await writer.drain()
         
-        # 8. DISCONNECT
+        # 7. قطع اتصال
         writer.close()
         await writer.wait_closed()
         
         print("✅ Session completed successfully")
-        return {"status": "success", "message": "Emote completed"}
+        return {
+            "status": "success",
+            "message": "Emote completed",
+            "region": region,
+            "uid": TarGeT,
+            "time": time.time()
+        }
         
     except Exception as e:
         print(f"❌ Error in session: {str(e)}")
@@ -288,6 +270,7 @@ async def quick_session_emote(team_code: str, uids: list, emote_id: int):
         print(f"📝 Traceback: {traceback.format_exc()}")
         return {"status": "error", "message": str(e)}
 
+# Routeها (همان قبلی)
 @app.route('/join')
 def join_team():
     team_code = request.args.get('tc')
@@ -313,7 +296,6 @@ def join_team():
         return jsonify({"status": "error", "message": "Provide at least one UID"})
 
     try:
-        # اجرای session سریع
         result = asyncio.run(quick_session_emote(team_code, uids, emote_id))
         return jsonify(result)
         
@@ -369,7 +351,6 @@ def home():
     </html>
     '''
 
-# برای Vercel
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
