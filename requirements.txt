@@ -8,5 +8,6 @@ pytz==2023.3
 pyjwt==2.8.0
 pycryptodome==3.19.0
 protobuf==4.24.4
-protobuf-decoder==0.1.1
+protobuf-decoder
 asyncio==3.4.3
+cfonts
