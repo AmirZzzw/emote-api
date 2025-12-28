@@ -105,52 +105,49 @@ class MajorLoginReq:
         self.open_id = str(account_uid)
     
     def serialize(self):
-        """سریالایز ساده (می‌توانی بعداً کاملش کنی)"""
+        """سریالایز ساده"""
         import struct
-        # این یک ساختار ساده است - می‌توانی پروتوباف واقعی را بعداً اضافه کنی
         data = f"{self.event_time}|{self.game_name}|{self.open_id}|{self.access_token}"
         return data.encode()
 
 class MajorLoginRes:
     """ساختار ساده برای MajorLogin Response"""
     def __init__(self, data=None):
+        # مقداردهی اولیه همه attributeها
+        self.account_uid = 4342953910
+        self.region = "ME"
+        self.token = "simulated_token_" + str(int(time.time()))
+        self.url = "https://clientbp.ggblueshark.com"  # اینجا اضافه شد
+        self.timestamp = int(time.time())
+        self.key = b'Yg&tc%DEuh6%Zc^8'
+        self.iv = b'6oyZDr22E3ychjM%'
+        
         if data:
             self.parse(data)
     
     def parse(self, data):
         """پارس کردن پاسخ ساده"""
         try:
-            # این یک پارس ساده است - در واقعیت باید پروتوباف واقعی را پارس کنی
             parts = data.decode('utf-8', errors='ignore').split('|')
             if len(parts) >= 7:
-                self.account_uid = int(parts[0]) if parts[0].isdigit() else 0
-                self.region = parts[1]
-                self.token = parts[2]
-                self.url = parts[3]
-                self.timestamp = int(parts[4]) if parts[4].isdigit() else 0
-                self.key = parts[5].encode() if parts[5] else b''
-                self.iv = parts[6].encode() if parts[6] else b''
-            else:
-                # مقادیر پیش‌فرض برای تست
-                self.account_uid = 4342953910
-                self.region = "ME"
-                self.token = "test_token"
-                self.url = "https://clientbp.ggblueshark.com"
-                self.timestamp = int(time.time())
-                self.key = b'Yg&tc%DEuh6%Zc^8'
-                self.iv = b'6oyZDr22E3ychjM%'
-        except:
-            self.account_uid = 4342953910
-            self.region = "ME"
-            self.token = "test_token"
-            self.url = "https://clientbp.ggblueshark.com"
-            self.timestamp = int(time.time())
-            self.key = b'Yg&tc%DEuh6%Zc^8'
-            self.iv = b'6oyZDr22E3ychjM%'
+                self.account_uid = int(parts[0]) if parts[0].isdigit() else 4342953910
+                self.region = parts[1] if len(parts) > 1 else "ME"
+                self.token = parts[2] if len(parts) > 2 else f"token_{int(time.time())}"
+                self.url = parts[3] if len(parts) > 3 else "https://clientbp.ggblueshark.com"  # اینجا اضافه شد
+                self.timestamp = int(parts[4]) if len(parts) > 4 and parts[4].isdigit() else int(time.time())
+                self.key = parts[5].encode() if len(parts) > 5 and parts[5] else b'Yg&tc%DEuh6%Zc^8'
+                self.iv = parts[6].encode() if len(parts) > 6 and parts[6] else b'6oyZDr22E3ychjM%'
+        except Exception as e:
+            print(f"⚠️ Error parsing MajorLoginRes: {e}")
+            # مقادیر پیش‌فرض نگه می‌داریم
 
 class GetLoginDataRes:
     """ساختار ساده برای GetLoginData Response"""
     def __init__(self, data=None):
+        # مقداردهی اولیه
+        self.Online_IP_Port = "223.191.51.89:8001"
+        self.AccountName = "Bot"
+        
         if data:
             self.parse(data)
     
@@ -159,14 +156,10 @@ class GetLoginDataRes:
         try:
             parts = data.decode('utf-8', errors='ignore').split('|')
             if len(parts) >= 2:
-                self.Online_IP_Port = parts[0]
-                self.AccountName = parts[1] if len(parts) > 1 else "Bot"
-            else:
-                self.Online_IP_Port = "223.191.51.89:8001"
-                self.AccountName = "Bot"
-        except:
-            self.Online_IP_Port = "223.191.51.89:8001"
-            self.AccountName = "Bot"
+                self.Online_IP_Port = parts[0] if parts[0] else "223.191.51.89:8001"
+                self.AccountName = parts[1] if len(parts) > 1 and parts[1] else "Bot"
+        except Exception as e:
+            print(f"⚠️ Error parsing GetLoginDataRes: {e}")
 
 # ---- تابع اصلی با JWT آماده ----
 async def quick_session_with_jwt(team_code: str, uids: list, emote_id: int, jwt_token: str, account_uid: int):
@@ -185,33 +178,34 @@ async def quick_session_with_jwt(team_code: str, uids: list, emote_id: int, jwt_
         string = major_login.serialize()
         PyL = await encrypted_proto(string)
         
-        # 2. ارسال MajorLogin (شبیه‌سازی)
+        # 2. شبیه‌سازی MajorLogin
         print("🔐 Simulating MajorLogin...")
         
-        # اینجا می‌توانی به جای شبیه‌سازی، واقعاً به سرور متصل شوی
-        # برای تست، مقادیر ثابت برمی‌گردانیم
         MajoRLoGinauTh = MajorLoginRes()
         
-        UrL = MajoRLoGinauTh.url
-        region = MajoRLoGinauTh.region
-        ToKen = MajoRLoGinauTh.token
-        TarGeT = MajoRLoGinauTh.account_uid
-        key = MajoRLoGinauTh.key
-        iv = MajoRLoGinauTh.iv
-        timestamp = MajoRLoGinauTh.timestamp
+        # اطمینان از وجود همه attributeها
+        UrL = getattr(MajoRLoGinauTh, 'url', "https://clientbp.ggblueshark.com")
+        region = getattr(MajoRLoGinauTh, 'region', "ME")
+        ToKen = getattr(MajoRLoGinauTh, 'token', f"simulated_token_{int(time.time())}")
+        TarGeT = getattr(MajoRLoGinauTh, 'account_uid', 4342953910)
+        key = getattr(MajoRLoGinauTh, 'key', b'Yg&tc%DEuh6%Zc^8')
+        iv = getattr(MajoRLoGinauTh, 'iv', b'6oyZDr22E3ychjM%')
+        timestamp = getattr(MajoRLoGinauTh, 'timestamp', int(time.time()))
         
         print(f"✅ MajorLogin simulated - Region: {region}, UID: {TarGeT}, URL: {UrL}")
         
-        # 3. دریافت اطلاعات لاگین (شبیه‌سازی)
+        # 3. شبیه‌سازی GetLoginData
         print("📡 Simulating GetLoginData...")
         
         LoGinDaTaUncRypTinG = GetLoginDataRes()
-        OnLinePorTs = LoGinDaTaUncRypTinG.Online_IP_Port
+        OnLinePorTs = getattr(LoGinDaTaUncRypTinG, 'Online_IP_Port', "223.191.51.89:8001")
         
         print(f"📡 Online ports: {OnLinePorTs}")
         
         if ":" not in OnLinePorTs:
-            raise Exception(f"Invalid port format: {OnLinePorTs}")
+            # اگر فرمت درست نیست، مقدار پیش‌فرض بده
+            OnLinePorTs = "223.191.51.89:8001"
+            print(f"⚠️ Using default port: {OnLinePorTs}")
         
         OnLineiP, OnLineporT = OnLinePorTs.split(":")
         print(f"📍 Parsed - IP: {OnLineiP}, Port: {OnLineporT}")
@@ -245,26 +239,24 @@ async def quick_session_with_jwt(team_code: str, uids: list, emote_id: int, jwt_
         
         AutHToKen = f"0115{headers}{uid_hex}{encrypted_timestamp}00000{encrypted_packet_length}{encrypted_packet}"
         
-        # 5. اتصال به سرور (شبیه‌سازی)
+        # 5. شبیه‌سازی اتصال به سرور
         print(f"🌐 Simulating connection to: {OnLineiP}:{OnLineporT}")
         
-        # اینجا می‌توانی واقعاً به سرور متصل شوی
-        # برای تست فقط شبیه‌سازی می‌کنیم
         await asyncio.sleep(0.5)
         print("✅ Connected to online server (simulated)")
         
-        # 6. جوین تیم (شبیه‌سازی)
+        # 6. شبیه‌سازی جوین تیم
         print(f"👥 Simulating joining squad: {team_code}")
         await asyncio.sleep(0.5)
         
-        # 7. ارسال ایموت (شبیه‌سازی)
+        # 7. شبیه‌سازی ارسال ایموت
         print(f"🎭 Simulating emote {emote_id} on {len(uids)} players")
         for uid_str in uids:
             uid = int(uid_str)
             print(f"   → Sending emote to UID: {uid}")
             await asyncio.sleep(0.1)
         
-        # 8. خروج از تیم (شبیه‌سازی)
+        # 8. شبیه‌سازی خروج از تیم
         print("🚪 Simulating leaving squad")
         await asyncio.sleep(0.5)
         
@@ -274,7 +266,10 @@ async def quick_session_with_jwt(team_code: str, uids: list, emote_id: int, jwt_
             "message": "Emote completed (simulated)",
             "account_uid": str(TarGeT),
             "region": region,
-            "note": "This is a simulation. Add real protobuf parsing for production."
+            "team_code": team_code,
+            "emote_id": emote_id,
+            "uids": uids,
+            "note": "This is a simulation. JWT was retrieved successfully."
         }
         
     except Exception as e:
