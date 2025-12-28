@@ -8,3 +8,4 @@ pycryptodome==3.19.0
 protobuf==4.24.4
 pytz==2023.3
 psutil==5.9.6
+protobuf-decoder @ git+https://github.com/mildsunrise/protobuf-decoder.git
