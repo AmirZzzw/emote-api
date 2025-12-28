@@ -9,5 +9,6 @@ pyjwt
 pycryptodome
 protobuf
 protobuf-decoder
-asyncio
 cfonts
+asyncio
+cachetools
