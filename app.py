@@ -2,17 +2,24 @@ import requests, os, ssl, asyncio, json
 import aiohttp
 from flask import Flask, request, jsonify
 import socket
-from xC4 import *  # از توابع رمزنگاری موجود
-from Pb2 import MajoRLoGinrEs_pb2, PorTs_pb2
 import time
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad
+from Pb2 import PorTs_pb2
+from xC4 import *  # ✅ این خط مهمه! تمام توابع xC4 رو import کن
 
 app = Flask(__name__)
 
-# JWT Token های آماده
-import requests
-import time
+# تنظیمات
+JWT_TOKENS_URL = "https://raw.githubusercontent.com/AmirZzzw/info-api/main/jwt.json"
+TOKEN_CACHE_DURATION = 300  # 5 دقیقه
 
-JWT_TOKENS_URL = "https://github.com/AmirZzzw/info-api/raw/refs/heads/main/jwt.json"
+# متغیرهای cache
+_jwt_tokens = None
+_last_fetch_time = 0
+_login_data_cache = None
+_login_cache_expiry = 0
+LOGIN_CACHE_DURATION = 1800  # 30 دقیقه
 
 # Headers پیشفرض
 Hr = {
@@ -26,13 +33,8 @@ Hr = {
     'ReleaseVersion': "OB51"
 }
 
-# Cache برای JWT Tokens
-_jwt_tokens = None
-_last_fetch_time = 0
-TOKEN_CACHE_DURATION = 300  # 5 دقیقه
-
 async def get_jwt_tokens():
-    """دریافت JWT Tokens از لینک با cache"""
+    """دریافت JWT Tokens از GitHub"""
     global _jwt_tokens, _last_fetch_time
     
     current_time = time.time()
@@ -40,290 +42,290 @@ async def get_jwt_tokens():
         return _jwt_tokens
     
     try:
-        # استفاده از requests به جای aiohttp برای GitHub
-        response = requests.get(
-            JWT_TOKENS_URL,
-            headers={
-                'Accept': 'application/json',
-                'User-Agent': 'Mozilla/5.0'
-            },
-            timeout=10
-        )
-        
-        if response.status_code == 200:
-            _jwt_tokens = response.json()
-            _last_fetch_time = current_time
-            print(f"✅ Loaded {len(_jwt_tokens)} JWT tokens")
-            return _jwt_tokens
-        else:
-            print(f"❌ GitHub API error: {response.status_code}")
-            
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                JWT_TOKENS_URL,
+                headers={
+                    'Accept': 'application/json',
+                    'User-Agent': 'Mozilla/5.0'
+                },
+                timeout=10
+            ) as response:
+                if response.status == 200:
+                    _jwt_tokens = await response.json()
+                    _last_fetch_time = current_time
+                    print(f"✅ Loaded {len(_jwt_tokens)} JWT tokens")
+                    return _jwt_tokens
+                else:
+                    print(f"❌ GitHub error: {response.status}")
+                    
     except Exception as e:
         print(f"❌ Error fetching JWT tokens: {e}")
+        # Fallback با requests
+        try:
+            response = requests.get(JWT_TOKENS_URL, timeout=10)
+            if response.status_code == 200:
+                _jwt_tokens = response.json()
+                _last_fetch_time = current_time
+                print(f"✅ Loaded tokens via requests")
+                return _jwt_tokens
+        except Exception as e2:
+            print(f"❌ Requests also failed: {e2}")
     
     return _jwt_tokens or []
 
 async def get_next_jwt_token():
-    """دریافت یک JWT Token از لیست (round-robin)"""
+    """دریافت یک JWT Token از لیست"""
     tokens = await get_jwt_tokens()
     if not tokens:
         raise Exception("No JWT tokens available")
-    
-    # Simple round-robin selection
-    # می‌توانید اینجا منطق بهتری برای انتخاب توکن اضافه کنید
-    return tokens[0]["token"]  # اولین توکن را برمی‌گرداند
+    return tokens[0]["token"]
 
 async def get_login_data_from_jwt(jwt_token):
-    """دریافت اطلاعات Login مستقیماً با JWT Token"""
-    try:
-        # 1. مستقیماً GetLoginData را با JWT Token فراخوانی کنیم
-        # ابتدا باید URL مناسب را پیدا کنیم
+    """دریافت اطلاعات Login با JWT Token"""
+    print("🔄 Fetching login data from server...")
+    
+    # از تابع encrypted_proto که حالا import شده استفاده کن
+    empty_payload = await encrypted_proto(b"")
+    
+    # URL های سرور
+    possible_urls = [
+        "https://clientbp.ggblueshark.com",
+        "https://clientbp.common.ggbluefox.com",
+        "https://clientbp.common.ggbluered.com",
+        "https://clientbp.common.ggblueshark.com"
+    ]
+    
+    for base_url in possible_urls:
+        url = f"{base_url}/GetLoginData"
+        headers = Hr.copy()
+        headers['Authorization'] = f"Bearer {jwt_token}"
         
-        # URL های ممکن برای سرورها (بر اساس region)
-        possible_urls = [
-            "https://clientbp.ggblueshark.com",
-            "https://clientbp.common.ggbluefox.com",
-            "https://clientbp.common.ggbluered.com",
-            "https://clientbp.common.ggblueshark.com"
-        ]
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
         
-        # Payload خالی برای GetLoginData
-        empty_payload = await encrypted_proto(b"")  # از تابع موجود در xC4
-        
-        # امتحان هر URL تا یکی کار کند
-        for base_url in possible_urls:
-            url = f"{base_url}/GetLoginData"
-            
-            headers = Hr.copy()
-            headers['Authorization'] = f"Bearer {jwt_token}"
-            
-            ssl_context = ssl.create_default_context()
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
-            
-            try:
-                async with aiohttp.ClientSession() as session:
-                    async with session.post(url, data=empty_payload, headers=headers, ssl=ssl_context, timeout=10) as response:
-                        if response.status == 200:
-                            login_data_bytes = await response.read()
-                            
-                            # Decode پاسخ
-                            proto = PorTs_pb2.GetLoginData()
-                            proto.ParseFromString(login_data_bytes)
-                            
-                            print(f"✅ Found working URL: {base_url}")
-                            return {
-                                'url': base_url,
-                                'region': proto.Region,
-                                'account_uid': proto.AccountUID,
-                                'account_name': proto.AccountName,
-                                'online_ip_port': proto.Online_IP_Port,
-                                'account_ip_port': proto.AccountIP_Port,
-                                'clan_id': proto.Clan_ID if proto.Clan_ID else None,
-                                'clan_compiled_data': proto.Clan_Compiled_Data if proto.Clan_Compiled_Data else None
-                            }
-            except Exception as e:
-                print(f"⚠️ URL {base_url} failed: {e}")
-                continue
-        
-        raise Exception("No working server URL found")
-        
-    except Exception as e:
-        print(f"❌ Error in get_login_data_from_jwt: {e}")
-        raise
+        try:
+            timeout = aiohttp.ClientTimeout(total=15)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.post(
+                    url, 
+                    data=empty_payload, 
+                    headers=headers, 
+                    ssl=ssl_context
+                ) as response:
+                    
+                    if response.status == 200:
+                        login_data_bytes = await response.read()
+                        proto = PorTs_pb2.GetLoginData()
+                        proto.ParseFromString(login_data_bytes)
+                        
+                        print(f"✅ Login successful! Region: {proto.Region}, UID: {proto.AccountUID}")
+                        
+                        return {
+                            'url': base_url,
+                            'region': proto.Region,
+                            'account_uid': proto.AccountUID,
+                            'account_name': proto.AccountName,
+                            'online_ip_port': proto.Online_IP_Port,
+                            'account_ip_port': proto.AccountIP_Port,
+                            'clan_id': proto.Clan_ID if proto.Clan_ID else None,
+                            'clan_compiled_data': proto.Clan_Compiled_Data if proto.Clan_Compiled_Data else None,
+                            'jwt_token': jwt_token
+                        }
+                    else:
+                        print(f"⚠️ {base_url} - Status: {response.status}")
+                        
+        except Exception as e:
+            print(f"⚠️ {base_url} error: {str(e)}")
+            continue
+    
+    raise Exception("Failed to connect to any game server")
 
 async def get_cached_login_data():
-    """Cache برای اطلاعات Login"""
-    cache_key = "login_data_cache"
-    cache_file = "login_cache.json"
+    """دریافت Login Data با Cache"""
+    global _login_data_cache, _login_cache_expiry
     
-    # چک کردن cache فایل
-    if os.path.exists(cache_file):
-        try:
-            with open(cache_file, 'r') as f:
-                cache_data = json.load(f)
-            
-            # چک کردن expire (1 ساعت)
-            if time.time() - cache_data.get('timestamp', 0) < 3600:
-                print("🎯 Using cached login data")
-                return cache_data['data']
-        except:
-            pass
+    current_time = time.time()
     
-    # اگر cache معتبر نبود، دریافت جدید
-    print("🔄 Fetching new login data...")
+    # اگر cache معتبر است
+    if _login_data_cache and (current_time - _login_cache_expiry) < LOGIN_CACHE_DURATION:
+        print("🎯 Using cached login data")
+        return _login_data_cache
+    
+    # دریافت جدید
+    print("🔄 Fetching fresh login data...")
     jwt_token = await get_next_jwt_token()
     login_data = await get_login_data_from_jwt(jwt_token)
     
-    # اضافه کردن JWT token به داده‌ها
-    login_data['jwt_token'] = jwt_token
-    
     # ذخیره در cache
-    cache_data = {
-        'timestamp': time.time(),
-        'data': login_data
-    }
-    
-    with open(cache_file, 'w') as f:
-        json.dump(cache_data, f)
+    _login_data_cache = login_data
+    _login_cache_expiry = current_time
     
     return login_data
 
-async def xAuThSTarTuP(TarGeT, token, timestamp, key, iv):
-    """همان تابع قبلی - نیاز به توابع EnC_PacKeT و DecodE_HeX از xC4 دارد"""
-    uid_hex = hex(TarGeT)[2:]
-    uid_length = len(uid_hex)
-    encrypted_timestamp = await DecodE_HeX(timestamp)
-    encrypted_account_token = token.encode().hex()
-    encrypted_packet = await EnC_PacKeT(encrypted_account_token, key, iv)
-    encrypted_packet_length = hex(len(encrypted_packet) // 2)[2:]
-    
-    if uid_length == 9:
-        headers = '0000000'
-    elif uid_length == 8:
-        headers = '00000000'
-    elif uid_length == 10:
-        headers = '000000'
-    elif uid_length == 7:
-        headers = '000000000'
-    else:
-        print('Unexpected length')
-        headers = '0000000'
-    
-    return f"0115{headers}{uid_hex}{encrypted_timestamp}00000{encrypted_packet_length}{encrypted_packet}"
-
 async def quick_session_emote(team_code: str, uids: list, emote_id: int):
-    """Session سریع با JWT Token آماده"""
+    """Session سریع برای ارسال ایموت"""
     
-    print(f"🚀 Starting quick session for team: {team_code}, uids: {uids}, emote: {emote_id}")
+    print(f"🚀 Starting session for team: {team_code}, emotes: {emote_id}")
     
     try:
-        # 1. دریافت اطلاعات Login از Cache یا JWT
-        print("🔐 Getting login data...")
+        # 1. دریافت Login Data
         login_data = await get_cached_login_data()
         
-        # استخراج داده‌ها
+        # 2. آماده‌سازی داده‌ها
         region = login_data['region']
-        TarGeT = login_data['account_uid']
+        account_uid = login_data['account_uid']
         online_ip_port = login_data['online_ip_port']
-        jwt_token = login_data.get('jwt_token')
+        jwt_token = login_data['jwt_token']
         
-        # کلیدهای رمزنگاری - نیاز به استخراج از JWT یا استفاده از مقادیر ثابت
-        # اگر در JWT موجود نیستند، می‌توانید از مقادیر پیش‌فرض استفاده کنید
-        key = b'Yg&tc%DEuh6%Zc^8'  # از xC4.py
-        iv = b'6oyZDr22E3ychjM%'   # از xC4.py
+        # کلیدهای رمزنگاری (همانند xC4.py)
+        key = b'Yg&tc%DEuh6%Zc^8'
+        iv = b'6oyZDr22E3ychjM%'
         
-        # 2. اتصال به سرور Online
-        print(f"🌐 Connecting to online server: {online_ip_port}")
+        # 3. اتصال به سرور
+        print(f"🌐 Connecting to server: {online_ip_port}")
         
         if ":" not in online_ip_port:
-            raise Exception(f"Invalid port format: {online_ip_port}")
+            raise Exception("Invalid server address format")
         
-        OnLineiP, OnLineporT = online_ip_port.split(":")
+        ip, port = online_ip_port.split(":")
         
-        # ساخت Auth Token - نیاز به timestamp داریم
-        # از زمان فعلی استفاده می‌کنیم
+        # ساخت Auth Token
         timestamp = int(time.time())
-        AutHToKen = await xAuThSTarTuP(TarGeT, jwt_token, timestamp, key, iv)
+        auth_token = await xAuThSTarTuP(account_uid, jwt_token, timestamp, key, iv)
         
-        # اتصال به سرور
+        # اتصال TCP
         try:
             reader, writer = await asyncio.wait_for(
-                asyncio.open_connection(OnLineiP, int(OnLineporT)),
-                timeout=10.0
+                asyncio.open_connection(ip, int(port)),
+                timeout=15.0
             )
         except asyncio.TimeoutError:
             raise Exception("Connection timeout")
         
-        print("✅ Connected to online server")
+        print("✅ Connected to game server")
         
-        # 3. احراز هویت
-        bytes_payload = bytes.fromhex(AutHToKen)
-        writer.write(bytes_payload)
+        # ارسال Auth
+        writer.write(bytes.fromhex(auth_token))
         await writer.drain()
-        await asyncio.sleep(0.5)  # منتظر پاسخ سرور
+        await asyncio.sleep(1)
         
         # 4. جوین تیم
-        print(f"👥 Joining squad: {team_code}")
-        EM = await GenJoinSquadsPacket(team_code, key, iv)
-        writer.write(EM)
+        print(f"👥 Joining team: {team_code}")
+        join_packet = await GenJoinSquadsPacket(team_code, key, iv)
+        writer.write(join_packet)
         await writer.drain()
-        await asyncio.sleep(1.0)  # منتظر جوین شدن
+        await asyncio.sleep(2)
         
-        # 5. انجام ایموت
-        print(f"🎭 Performing emote {emote_id} on {len(uids)} players")
+        # 5. ارسال ایموت
+        print(f"🎭 Sending emote {emote_id} to {len(uids)} players")
         for uid_str in uids:
             uid = int(uid_str)
-            H = await Emote_k(uid, emote_id, key, iv, region)
-            writer.write(H)
+            emote_packet = await Emote_k(uid, emote_id, key, iv, region)
+            writer.write(emote_packet)
             await writer.drain()
-            await asyncio.sleep(0.15)  # تأخیر کوتاه بین ایموت‌ها
+            await asyncio.sleep(0.2)
         
         # 6. خروج از تیم
-        print("🚪 Leaving squad")
-        LV = await ExiT(TarGeT, key, iv)  # استفاده از UID خود بات
-        writer.write(LV)
+        print("🚪 Leaving team")
+        leave_packet = await ExiT(account_uid, key, iv)
+        writer.write(leave_packet)
         await writer.drain()
         
         # 7. قطع اتصال
         writer.close()
         await writer.wait_closed()
         
-        print("✅ Session completed successfully")
+        print("✅ Session completed successfully!")
         return {
             "status": "success",
-            "message": "Emote completed",
+            "message": "Emote sent successfully",
             "region": region,
-            "uid": TarGeT,
-            "time": time.time()
+            "account_uid": str(account_uid),
+            "targets": uids,
+            "emote_id": emote_id
         }
         
     except Exception as e:
         print(f"❌ Error in session: {str(e)}")
         import traceback
-        print(f"📝 Traceback: {traceback.format_exc()}")
+        traceback.print_exc()
         return {"status": "error", "message": str(e)}
 
-# Routeها (همان قبلی)
+# Routes
 @app.route('/join')
 def join_team():
     team_code = request.args.get('tc')
-    uid1 = request.args.get('uid1')
-    uid2 = request.args.get('uid2')
-    uid3 = request.args.get('uid3')
-    uid4 = request.args.get('uid4')
-    uid5 = request.args.get('uid5')
-    uid6 = request.args.get('uid6')
-    emote_id_str = request.args.get('emote_id')
-
-    if not team_code or not emote_id_str:
-        return jsonify({"status": "error", "message": "Missing tc or emote_id"})
-
-    try:
-        emote_id = int(emote_id_str)
-    except:
-        return jsonify({"status": "error", "message": "emote_id must be integer"})
-
-    uids = [uid for uid in [uid1, uid2, uid3, uid4, uid5, uid6] if uid]
-
+    uids = [request.args.get(f'uid{i}') for i in range(1, 7)]
+    uids = [uid for uid in uids if uid]
+    emote_id = request.args.get('emote_id')
+    
+    if not team_code:
+        return jsonify({"status": "error", "message": "Missing team code (tc)"})
+    if not emote_id:
+        return jsonify({"status": "error", "message": "Missing emote_id"})
     if not uids:
         return jsonify({"status": "error", "message": "Provide at least one UID"})
-
+    
+    try:
+        emote_id = int(emote_id)
+    except:
+        return jsonify({"status": "error", "message": "emote_id must be integer"})
+    
     try:
         result = asyncio.run(quick_session_emote(team_code, uids, emote_id))
         return jsonify(result)
-        
     except Exception as e:
-        return jsonify({"status": "error", "message": f"Failed: {str(e)}"})
+        return jsonify({"status": "error", "message": str(e)})
 
 @app.route('/test')
 def test():
-    return jsonify({
-        "status": "online",
-        "message": "Emote API is running",
-        "usage": "/join?tc=TEAM_CODE&uid1=UID&emote_id=EMOTE_ID",
-        "example": "/join?tc=123456&uid1=4285785816&emote_id=909000063"
-    })
+    try:
+        tokens = asyncio.run(get_jwt_tokens())
+        tokens_count = len(tokens) if tokens else 0
+        
+        return jsonify({
+            "status": "online",
+            "message": "API is running",
+            "jwt_tokens_count": tokens_count,
+            "cache_info": {
+                "token_cache": "valid" if _jwt_tokens else "empty",
+                "login_cache": "valid" if _login_data_cache else "empty"
+            }
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+
+@app.route('/debug/jwt')
+def debug_jwt():
+    """Endpoint برای دیباگ دریافت توکن"""
+    try:
+        tokens = asyncio.run(get_jwt_tokens())
+        return jsonify({
+            "status": "success",
+            "tokens_count": len(tokens) if tokens else 0,
+            "tokens": tokens[:1] if tokens else []  # فقط اولی رو نشون بده
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+
+@app.route('/debug/login')
+def debug_login():
+    """Endpoint برای دیباگ Login Data"""
+    try:
+        login_data = asyncio.run(get_cached_login_data())
+        # حساس‌ترین داده‌ها رو پنهان کن
+        safe_data = login_data.copy()
+        if 'jwt_token' in safe_data:
+            safe_data['jwt_token'] = safe_data['jwt_token'][:50] + "..."
+        
+        return jsonify({
+            "status": "success",
+            "login_data": safe_data
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
 
 @app.route('/')
 def home():
@@ -336,6 +338,7 @@ def home():
                 h1 { color: #333; }
                 .endpoint { background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 5px; }
                 code { background: #eee; padding: 2px 5px; }
+                .debug { background: #fff3cd; padding: 10px; margin: 10px 0; border-radius: 5px; }
             </style>
         </head>
         <body>
@@ -345,26 +348,25 @@ def home():
             <div class="endpoint">
                 <h3>📤 Send Emote</h3>
                 <p><code>GET /join?tc=TEAM_CODE&uid1=UID&emote_id=EMOTE_ID</code></p>
-                <p><strong>Parameters:</strong></p>
+                <p><strong>Example:</strong> 
+                <a href="/join?tc=123456&uid1=4285785816&emote_id=909000063">
+                    /join?tc=123456&uid1=4285785816&emote_id=909000063
+                </a></p>
+            </div>
+            
+            <div class="debug">
+                <h3>🐛 Debug Endpoints</h3>
                 <ul>
-                    <li><code>tc</code>: Team/Squad Code (required)</li>
-                    <li><code>uid1, uid2, ... uid6</code>: Player UIDs (at least one required)</li>
-                    <li><code>emote_id</code>: Emote ID (required)</li>
+                    <li><a href="/test">/test</a> - Check API status</li>
+                    <li><a href="/debug/jwt">/debug/jwt</a> - Check JWT tokens</li>
+                    <li><a href="/debug/login">/debug/login</a> - Check login data</li>
                 </ul>
-                <p><strong>Example:</strong> <a href="/join?tc=123456&uid1=4285785816&emote_id=909000063">/join?tc=123456&uid1=4285785816&emote_id=909000063</a></p>
             </div>
-            
-            <div class="endpoint">
-                <h3>🩺 Test Endpoint</h3>
-                <p><code>GET /test</code> - Check API status</p>
-                <p><a href="/test">/test</a></p>
-            </div>
-            
-            <p><strong>Note:</strong> Each request creates a new session (login → join → emote → disconnect).</p>
         </body>
     </html>
     '''
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
+    print(f"🚀 Starting server on port {port}")
     app.run(host='0.0.0.0', port=port)
